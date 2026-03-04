@@ -1,5 +1,5 @@
 import { Header } from "@/components/dashboard/header"
-import { getUserProfile, getUserEnrollment, getModules, getLiveSessions, getUserCertificates } from "@/lib/data"
+import { getUserProfile, getUserEnrollment, getModules, getLiveSessions, getUserCertificates, getUserCompletedLessons, getMicroLessons } from "@/lib/data"
 import Link from "next/link"
 import { CertificateGenerator } from "@/components/student/CertificateGenerator"
 
@@ -11,13 +11,27 @@ export default async function DashboardPage() {
   const modules = await getModules()
   const liveSessions = await getLiveSessions()
   const certificates = await getUserCertificates()
+  const completedLessons = await getUserCompletedLessons()
+  const microLessons = await getMicroLessons()
   
   const activeModule = modules.find(m => m.id === enrollment?.module_id) || modules[0];
   const progressPercent = enrollment?.progress || 0;
   
   // Encontrar la primera lección del módulo para el botón de continuar
-  const firstLesson = activeModule?.lessons?.[0];
+  const firstLesson = activeModule?.lessons?.filter(l => l.is_published)?.[0];
   const firstLessonId = firstLesson?.id;
+
+  // Revisar si el módulo actual está bloqueado por otro módulo
+  let isModuleLocked = false;
+  if (activeModule?.prerequisite_module_id) {
+    const prereqModule = modules.find(m => m.id === activeModule.prerequisite_module_id);
+    if (prereqModule) {
+      const publishedLessonsInPrereq = prereqModule.lessons?.filter(l => l.is_published) || [];
+      const isPrereqCompleted = publishedLessonsInPrereq.length > 0 && 
+        publishedLessonsInPrereq.every(l => completedLessons.includes(l.id));
+      isModuleLocked = !isPrereqCompleted;
+    }
+  }
 
   // Extraer el material PDF si existe en la lección
   let pdfActivityUrl = "";
@@ -39,15 +53,15 @@ export default async function DashboardPage() {
               Bienvenido de nuevo, <span className="text-primary">{displayName}</span>
             </h2>
             <p className="text-gray-600 dark:text-gray-400 max-w-2xl">
-              Continúa tu especialización en ecografía intervencionista. Tienes 2 módulos pendientes esta semana.
+              Continúa tu especialización en ecografía intervencionista.
             </p>
           </div>
           <div className="flex gap-3">
             <div className="text-right">
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tiempo de estudio</p>
-              <p className="text-xl font-bold text-secondary dark:text-white">12h 30m</p>
+              <p className="text-xl font-bold text-secondary dark:text-white">{(completedLessons.length * 15 / 60).toFixed(1)}h</p>
             </div>
-            <div className="h-10 w-[1px] bg-gray-300 dark:bg-gray-700 mx-2"></div>
+            <div className="h-10 w-px bg-gray-300 dark:bg-gray-700 mx-2"></div>
             <div className="text-right">
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Cursos Completados</p>
               <p className="text-xl font-bold text-secondary dark:text-white">{progressPercent === 100 ? 1 : 0}/{modules.length || 8}</p>
@@ -89,13 +103,18 @@ export default async function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  {firstLessonId ? (
+                  {isModuleLocked ? (
+                    <button disabled className="flex-1 bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500 font-semibold py-3 px-6 rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-700">
+                      <span className="material-symbols-outlined">lock</span>
+                      Bloqueado: Requiere Módulo Anterior
+                    </button>
+                  ) : firstLessonId ? (
                     <Link href={`/lessons/${firstLessonId}`} className="flex-1 bg-primary hover:bg-cyan-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary/25 transition-transform active:scale-95 flex items-center justify-center gap-2">
                       <span className="material-symbols-outlined">play_circle</span>
                       Continuar Lección
                     </Link>
                   ) : (
-                    <button className="flex-1 bg-primary/50 text-white font-semibold py-3 px-6 rounded-xl cursor-not-allowed flex items-center justify-center gap-2">
+                    <button disabled className="flex-1 bg-primary/50 text-white font-semibold py-3 px-6 rounded-xl cursor-not-allowed flex items-center justify-center gap-2">
                       <span className="material-symbols-outlined">play_circle</span>
                       Próximamente
                     </button>
@@ -124,81 +143,47 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-lg font-semibold text-secondary dark:text-white mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">bolt</span>
-                Micro-aprendizaje: Anatomía Ecográfica
+                Micro-aprendizaje Complementario
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                      <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary transition-colors">
-                        accessibility_new
-                      </span>
-                      <div className="absolute inset-0 bg-secondary/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-secondary dark:text-white group-hover:text-primary transition-colors">
-                        Rodilla: Meniscos
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                        Exploración axial y longitudinal de meniscos medial y lateral.
-                      </p>
-                      <span className="text-[10px] font-semibold text-gray-400 mt-2 block flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">schedule</span> 12 min
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                {microLessons.length > 0 ? (
+                  microLessons.slice(0, 3).map((ul) => (
+                    <Link key={ul.id} href={`/microlearning/${ul.id}`} className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all cursor-pointer group shadow-sm block">
+                      <div className="flex gap-4">
+                        <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center shrink-0 relative overflow-hidden">
+                          {ul.thumbnail_url ? (
+                            <img src={ul.thumbnail_url} alt={ul.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary transition-colors">
+                              play_circle
+                            </span>
+                          )}
+                          <div className="absolute inset-0 bg-secondary/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-secondary dark:text-white group-hover:text-primary transition-colors line-clamp-1">
+                            {ul.title}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                            {ul.description || 'Sin descripción'}
+                          </p>
+                          <span className="text-[10px] font-semibold text-gray-400 mt-2 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">schedule</span> {ul.duration_minutes} min
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 col-span-2">No hay temas de micro-aprendizaje disponibles por el momento.</p>
+                )}
 
-                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                      <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary transition-colors">
-                        pan_tool
-                      </span>
-                      <div className="absolute inset-0 bg-secondary/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-secondary dark:text-white group-hover:text-primary transition-colors">
-                        Mano: Túnel Carpiano
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                        Medición del Área del nervio mediano y retináculo.
-                      </p>
-                      <span className="text-[10px] font-semibold text-gray-400 mt-2 block flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">schedule</span> 8 min
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 transition-all cursor-pointer group shadow-sm">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                      <span className="material-symbols-outlined text-3xl text-gray-400 group-hover:text-primary transition-colors">
-                        foot_bones
-                      </span>
-                      <div className="absolute inset-0 bg-secondary/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-secondary dark:text-white group-hover:text-primary transition-colors">
-                        Tobillo: Ligamentos
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                        Evaluación del complejo ligamentario lateral tras esguince.
-                      </p>
-                      <span className="text-[10px] font-semibold text-gray-400 mt-2 block flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">schedule</span> 15 min
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer group flex items-center justify-center">
+                <Link href="/microlearning" className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer group flex items-center justify-center">
                   <div className="text-center">
                     <span className="material-symbols-outlined text-primary mb-1">add_circle</span>
                     <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Ver catálogo completo</p>
                   </div>
-                </div>
+                </Link>
               </div>
             </div>
           </div>

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { createQuiz } from "@/app/actions/contentSetup"
+import { createQuiz, getQuizByLessonId, updateQuiz } from "@/app/actions/contentSetup"
 import { useForm, useFieldArray, FormProvider } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -51,9 +51,18 @@ const quizSchema = z.object({
 
 type QuizFormValues = z.infer<typeof quizSchema>
 
-export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
-  const [isOpen, setIsOpen] = useState(false)
+export function QuizBuilder({ 
+  modules = [],
+  editLessonId,
+  onCloseEdit
+}: { 
+  modules: Module[]
+  editLessonId?: string
+  onCloseEdit?: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(!!editLessonId)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null)
   const supabase = createClient()
 
   const defaultQuizValues: Partial<QuizFormValues> = {
@@ -83,7 +92,9 @@ export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
   }
 
   const methods = useForm<QuizFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(quizSchema) as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     defaultValues: defaultQuizValues as any
   })
 
@@ -98,6 +109,60 @@ export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
 
   const selectedModule = watch("selectedModule")
   const activeModule = modules.find(m => m.id === selectedModule)
+
+  useEffect(() => {
+    if (editLessonId) {
+      setIsOpen(true)
+      const fetchQuiz = async () => {
+        const res = await getQuizByLessonId(editLessonId)
+        if (res.success && res.data) {
+           const dbQuiz = res.data;
+           setEditingQuizId(dbQuiz.id)
+           
+           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           const mappedQuestions = dbQuiz.questions?.map((q: any) => ({
+             id: q.id,
+             questionText: q.question_text,
+             difficulty: q.difficulty || 1,
+             is_critical: q.is_critical || false,
+             pearl: q.pearl || "",
+             source_reference: q.source_reference || "",
+             findings: q.findings || [],
+             options: q.options || [],
+             correctOptionId: q.correct_option_id,
+             score: q.score || 1,
+             imagePreview: q.image_url || undefined
+           })) || defaultQuizValues.questions;
+
+           let parentModuleId = "";
+           modules.forEach(m => {
+             if (m.lessons?.some(l => l.id === editLessonId)) {
+               parentModuleId = m.id;
+             }
+           });
+
+           reset({
+             selectedModule: parentModuleId,
+             selectedLesson: editLessonId,
+             quizTitle: dbQuiz.title,
+             minScore: dbQuiz.min_score_to_pass || 80,
+             questions: mappedQuestions
+           })
+        }
+      }
+      fetchQuiz()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editLessonId, modules])
+
+  const handleClose = () => {
+    setIsOpen(false)
+    if (onCloseEdit) onCloseEdit()
+    if (!editLessonId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      reset(defaultQuizValues as any)
+    }
+  }
 
   const processForm = async (data: QuizFormValues) => {
     setIsSubmitting(true)
@@ -140,22 +205,28 @@ export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
         }
       }))
 
-      // 2. Submit to Server Action
-      const payload = {
-        lessonId: data.selectedLesson,
-        title: data.quizTitle,
-        minScore: data.minScore,
-        questions: questionsToPersist
-      }
-
-      const result = await createQuiz(payload)
-      
-      if (result.success) {
-        toast.success("Evaluación guardada exitosamente")
-        setIsOpen(false)
-        reset() // Reset form to default values
+      let result;
+      if (editLessonId && editingQuizId) {
+        result = await updateQuiz({
+          quizId: editingQuizId,
+          title: data.quizTitle,
+          minScore: data.minScore,
+          questions: questionsToPersist
+        })
       } else {
-        toast.error(result.error || "Error al guardar la evaluación")
+        result = await createQuiz({
+          lessonId: data.selectedLesson,
+          title: data.quizTitle,
+          minScore: data.minScore,
+          questions: questionsToPersist
+        })
+      }
+      
+      if (result?.success) {
+        toast.success(editLessonId ? "Evaluación actualizada exitosamente" : "Evaluación guardada exitosamente")
+        handleClose()
+      } else {
+        toast.error(result?.error || "Error al guardar la evaluación")
       }
     } catch (error) {
        console.error(error)
@@ -167,24 +238,30 @@ export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 rounded-xl transition-colors font-semibold mt-4"
-      >
-        <span className="material-symbols-outlined text-base">quiz</span>
-        Constructor de Evaluaciones
-      </button>
+      {!editLessonId && (
+        <button 
+          onClick={() => setIsOpen(true)}
+          className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 rounded-xl transition-colors font-semibold mt-4"
+        >
+          <span className="material-symbols-outlined text-base">quiz</span>
+          Constructor de Evaluaciones
+        </button>
+      )}
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+          <div className="bg-white dark:bg-[#0B0F1A] rounded-none sm:rounded-2xl w-full max-w-4xl h-full sm:h-auto sm:max-h-[90vh] flex flex-col border-0 sm:border border-gray-200 dark:border-white/5 shadow-xl overflow-hidden">
             
             <div className="p-6 border-b border-gray-200 dark:border-white/5 flex items-center justify-between shrink-0 bg-white dark:bg-gray-900/40">
               <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
                 <span className="material-symbols-outlined text-violet-600 dark:text-violet-400">quiz</span>
-                Constructor de Cuestionarios Interactivo
+                {editLessonId ? "Edición de Cuestionario" : "Constructor de Cuestionarios Interactivo"}
               </h2>
-              <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors bg-gray-50 dark:bg-white/5 p-1.5 rounded-full shadow-sm hover:bg-gray-100 dark:hover:bg-white/10">
+              <button 
+                type="button" 
+                onClick={handleClose} 
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors bg-gray-50 dark:bg-white/5 p-1.5 rounded-full shadow-sm hover:bg-gray-100 dark:hover:bg-white/10"
+              >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
@@ -236,7 +313,7 @@ export function QuizBuilder({ modules = [] }: { modules: Module[] }) {
                       <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Asignar a Lección</label>
                       <select 
                         {...register("selectedLesson")}
-                        disabled={!selectedModule}
+                        disabled={!selectedModule || !!editLessonId}
                         className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50 text-gray-800 dark:text-gray-100"
                       >
                          <option value="" disabled className="dark:bg-gray-900">Selecciona una lección</option>

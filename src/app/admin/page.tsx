@@ -1,5 +1,6 @@
 import { AdminHeader } from "@/components/admin/AdminHeader"
 import { createClient } from "@/lib/supabase/server"
+import { Database } from "@/types/supabase"
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -22,9 +23,20 @@ function StatusBadge({ status }: { status: string }) {
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
   
-  // Fetch profiles
-  const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-  const totalDoctors = profiles?.length || 0;
+  // Fetch profiles (excluyendo admins para las métricas de estudiantes)
+  const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+  const profiles = profilesData?.filter(p => p.role !== 'admin') || [];
+  const totalDoctors = profiles.length;
+
+  // Fetch enrollments for real progress data
+  const { data: enrollments } = await supabase.from('enrollments').select('*');
+
+  // Calculate completion rate
+  let avgProgress = 0;
+  if (enrollments && enrollments.length > 0) {
+    const totalProgress = enrollments.reduce((sum, e) => sum + (e.progress || 0), 0);
+    avgProgress = Math.round(totalProgress / enrollments.length);
+  }
 
   // Fetch payments
   const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -36,8 +48,8 @@ export default async function AdminDashboardPage() {
   const kpiCards = [
     { label: "Ingresos del Mes", value: `$${totalIncome.toLocaleString()}`, change: "-", positive: true, icon: "payments" },
     { label: "Médicos Inscritos", value: totalDoctors.toString(), change: "Total", positive: true, icon: "groups" },
-    { label: "Tasa de Finalización", value: "Pendiente", change: "-", positive: true, icon: "trending_up" },
-    { label: "NPS Score", value: "Pendiente", change: "-", positive: true, icon: "star" },
+    { label: "Tasa de Finalización", value: `${avgProgress}%`, change: "Media", positive: true, icon: "trending_up" },
+    { label: "NPS Score", value: "Pendiente", change: "-", positive: true, icon: "star" }, // Pending actual feedback table
   ];
 
   const specialtyCounts = profiles?.reduce((acc: Record<string, number>, profile: { specialty?: string | null }) => {
@@ -59,13 +71,19 @@ export default async function AdminDashboardPage() {
        }
     });
 
-  const recentDoctors = (profiles || []).slice(0, 5).map((p: { full_name?: string | null, specialty?: string | null, state?: string | null, role?: string | null }) => ({
-    name: p.full_name || "Usuario",
-    specialty: p.specialty || "General",
-    city: p.state || "N/A",
-    progress: 0,
-    status: (p.role === "admin" ? "completed" : "active")
-  }));
+  const recentDoctors = profiles.slice(0, 5).map((p: Database['public']['Tables']['profiles']['Row']) => {
+    const userEnrollments = enrollments?.filter(e => e.user_id === p.id) || [];
+    const progress = userEnrollments.length > 0 ? Math.max(...userEnrollments.map(e => e.progress || 0)) : 0;
+    const isCompleted = progress === 100;
+    
+    return {
+      name: p.full_name || "Usuario",
+      specialty: p.specialty || "General",
+      city: p.state || "N/A",
+      progress: progress,
+      status: isCompleted ? "completed" : (progress > 0 ? "active" : "pending")
+    };
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -99,7 +117,7 @@ export default async function AdminDashboardPage() {
 
         {/* Alert Banner */}
         {pendingInvoices > 0 && (
-          <div className="bg-gradient-to-r from-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-xl px-5 py-4 flex items-center gap-3">
+          <div className="bg-linear-to-r from-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-xl px-5 py-4 flex items-center gap-3">
             <span className="material-symbols-outlined text-amber-400 text-xl">warning</span>
             <p className="text-sm text-amber-300 font-medium flex-1">
               Hay <strong>{pendingInvoices} facturas pendientes</strong> de revisión este mes.
@@ -133,7 +151,7 @@ export default async function AdminDashboardPage() {
                     ${(h * 650).toLocaleString()}
                   </span>
                   <div
-                    className="w-full rounded-t-lg bg-gradient-to-t from-primary/80 to-primary transition-all duration-500 hover:from-primary hover:to-cyan-400"
+                    className="w-full rounded-t-lg bg-linear-to-t from-primary/80 to-primary transition-all duration-500 hover:from-primary hover:to-cyan-400"
                     style={{ height: `${h * 2.5}px` }}
                   />
                   <span className="text-[10px] text-gray-500">
@@ -201,8 +219,8 @@ export default async function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentDoctors.map((doc) => (
-                  <tr key={doc.name} className="border-b border-gray-50 dark:border-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                {recentDoctors.map((doc: { name: string, specialty: string, city: string, progress: number, status: string }) => (
+                  <tr key={doc.name} className="border-b border-gray-50 dark:border-white/3 hover:bg-gray-50 dark:hover:bg-white/2 transition-colors">
                     <td className="px-6 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

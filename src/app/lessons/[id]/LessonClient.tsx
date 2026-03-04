@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { completeLessonProgress } from '@/app/actions/contentSetup'
+import { completeLessonProgress, submitQuizAttempt } from '@/app/actions/contentSetup'
 import MuxPlayer from '@mux/mux-player-react'
 
 type LessonItem = {
@@ -13,6 +13,7 @@ type LessonItem = {
   order_index?: number | null
   lesson_type?: string | null
   is_completed?: boolean
+  is_locked?: boolean
 }
 
 // ============ Progress Bar ============
@@ -183,7 +184,22 @@ function LessonSidebar({ sidebarOpen, setSidebarOpen, moduleTitle, moduleLessons
             const isActive = l.id === currentLessonId
             const icon = iconMap[l.lesson_type || ''] || 'play_circle'
 
-            return (
+            return l.is_locked ? (
+              <div
+                key={l.id}
+                className={`flex items-center gap-3 p-3 rounded-xl text-sm transition-all group opacity-50 cursor-not-allowed
+                  text-gray-500 dark:text-gray-500`}
+                title="Lección bloqueada (requiere prerrequisito)"
+              >
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors bg-gray-200 dark:bg-gray-800 text-gray-400">
+                  <span className="material-symbols-outlined text-[14px]">lock</span>
+                </div>
+                <span className="flex-1 line-clamp-2 leading-snug">{l.title}</span>
+                <span className="material-symbols-outlined text-base shrink-0 text-gray-400">
+                  {icon}
+                </span>
+              </div>
+            ) : (
               <Link
                 key={l.id}
                 href={`/lessons/${l.id}`}
@@ -295,7 +311,7 @@ export function LessonClient({
     }
   }
 
-  const handleQuizSubmit = () => {
+  const handleQuizSubmit = async () => {
     if (!quizData || !quizData.questions) return
     let correctCount = 0
     let totalScore = 0
@@ -307,10 +323,29 @@ export function LessonClient({
     const percentage = Math.round((correctCount / totalScore) * 100)
     setScore(percentage)
     setShowResults(true)
-    if (percentage >= (quizData.min_score_to_pass || 80)) {
-      handleComplete(percentage)
+    
+    const isPassed = percentage >= (quizData.min_score_to_pass || 80)
+    
+    setMarking(true)
+    const res = await submitQuizAttempt({
+      lessonId: lesson.id,
+      quizId: quizData.id,
+      score: percentage,
+      passed: isPassed
+    })
+    setMarking(false)
+
+    if (res?.success) {
+      if (isPassed) {
+        setIsCompleted(true)
+        setShowFloatingNext(true)
+        toast.success(`¡Cuestionario aprobado! Calificación: ${percentage}%`)
+        router.refresh()
+      } else {
+        toast.error(`Calificación: ${percentage}%. Necesitas al menos ${quizData.min_score_to_pass || 80}% para aprobar.`)
+      }
     } else {
-      toast.error(`Calificación: ${percentage}%. Necesitas al menos ${quizData.min_score_to_pass || 80}% para aprobar.`)
+      toast.error('Error al guardar el intento: ' + res?.error)
     }
   }
 

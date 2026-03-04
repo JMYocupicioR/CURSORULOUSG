@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bienvenido al Curso</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f1f5f9;
+        font-family: "Helvetica Neue", Arial, sans-serif;
+      }
+      .wrapper {
+        max-width: 600px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+      }
+      .header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 32px 40px;
+        text-align: center;
+      }
+      .header img {
+        height: 48px;
+      }
+      .header-badge {
+        display: inline-block;
+        background: rgba(45, 212, 191, 0.15);
+        border: 1px solid rgba(45, 212, 191, 0.3);
+        color: #2dd4bf;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 4px 12px;
+        border-radius: 100px;
+        margin-top: 16px;
+      }
+      .hero {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 0 40px 40px;
+        text-align: center;
+      }
+      .hero h1 {
+        color: #ffffff;
+        font-size: 28px;
+        font-weight: 800;
+        margin: 0 0 8px;
+      }
+      .hero p {
+        color: #94a3b8;
+        font-size: 15px;
+        margin: 0;
+      }
+      .body {
+        padding: 40px;
+      }
+      .greeting {
+        font-size: 16px;
+        color: #334155;
+        margin-bottom: 16px;
+      }
+      .message {
+        font-size: 15px;
+        color: #64748b;
+        line-height: 1.7;
+        margin-bottom: 32px;
+      }
+      .cta-btn {
+        display: inline-block;
+        background: linear-gradient(135deg, #2dd4bf 0%, #0ea5e9 100%);
+        color: #ffffff !important;
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 700;
+        padding: 14px 36px;
+        border-radius: 12px;
+        margin-bottom: 32px;
+      }
+      .divider {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 32px 0;
+      }
+      .feature-grid {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+      .feature-box {
+        flex: 1;
+        min-width: 140px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+      }
+      .feature-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      .feature-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 4px;
+      }
+      .feature-desc {
+        font-size: 12px;
+        color: #64748b;
+      }
+      .footer {
+        background: #f8fafc;
+        padding: 24px 40px;
+        text-align: center;
+        border-top: 1px solid #e2e8f0;
+      }
+      .footer p {
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 4px 0;
+      }
+      .footer a {
+        color: #2dd4bf;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="header">
+        <div
+          style="
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+          "
+        >
+          <span style="color: #2dd4bf">●</span> CourseUSG
+        </div>
+        <div class="header-badge">🎓 Bienvenido al Programa</div>
+      </div>
+
+      <div class="hero">
+        <h1>¡Tu acceso está listo!</h1>
+        <p>
+          Diplomado en Rehabilitación Intervencionista Guiada por Ultrasonido
+        </p>
+      </div>
+
+      <div class="body">
+        <div class="greeting">Hola, <strong>{{ .Email }}</strong></div>
+        <div class="message">
+          Nos da mucho gusto tenerte en nuestra plataforma. Tu cuenta ya está
+          activa y puedes comenzar a explorar el contenido del diplomado de
+          forma inmediata. Haz clic en el botón de abajo para confirmar tu
+          correo y acceder al dashboard.
+        </div>
+
+        <div style="text-align: center">
+          <a href="{{ .ConfirmationURL }}" class="cta-btn">
+            ✓ Confirmar Email y Entrar
+          </a>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="feature-grid">
+          <div class="feature-box">
+            <div class="feature-icon">🎬</div>
+            <div class="feature-title">Videos HD en Mux</div>
+            <div class="feature-desc">Reproducción sin interrupciones</div>
+          </div>
+          <div class="feature-box">
+            <div class="feature-icon">🧠</div>
+            <div class="feature-title">Micro-Aprendizaje</div>
+            <div class="feature-desc">Lecciones cortas por tema</div>
+          </div>
+          <div class="feature-box">
+            <div class="feature-icon">📜</div>
+            <div class="feature-title">Certificados PDF</div>
+            <div class="feature-desc">Descargables al aprobar</div>
+          </div>
+        </div>
+
+        <div class="message" style="font-size: 13px">
+          Si no creaste esta cuenta, puedes ignorar este mensaje con seguridad.
+          El enlace expirará en 24 horas.
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>
+          <strong
+            >Diplomado Completivo en Rehabilitación Intervencionista Guiada por
+            Ultrasonido</strong
+          >
+        </p>
+        <p>Dr. Raúl Morales · DeepLuxMed</p>
+        <p style="margin-top: 12px">
+          <a href="{{ .SiteURL }}">Ir al sit web</a> &nbsp;·&nbsp;
+          <a href="{{ .SiteURL }}/privacidad">Política de Privacidad</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

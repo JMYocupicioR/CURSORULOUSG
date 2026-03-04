@@ -3,11 +3,22 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import Mux from "@mux/mux-node";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID!,
   tokenSecret: process.env.MUX_TOKEN_SECRET!,
 });
+
+/**
+ * Valida si el usuario actual tiene permisos de administrador.
+ */
+async function verifyAdmin(supabase: SupabaseClient) {
+  const { data: user, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.user) return false;
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.user.id).single();
+  return profile?.role === 'admin';
+}
 
 /**
  * Registra una nueva lección (video) en la base de datos.
@@ -24,11 +35,9 @@ export async function createVideoLesson(data: {
 }) {
   const supabase = await createClient();
 
-  const { data: user, error: authError } = await supabase.auth.getUser();
-  if (authError || !user?.user) return { success: false, error: "Unauthorized" };
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.user.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   const { error } = await supabase.from("lessons").insert({
     module_id: data.moduleId,
@@ -60,10 +69,9 @@ export async function addDocumentToLesson(data: {
 }) {
   const supabase = await createClient();
 
-  // Verificación de admin
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   // Obtenemos los materiales previos
   const { data: lesson, error: fetchError } = await supabase.from("lessons").select("materials").eq("id", data.lessonId).single();
@@ -107,9 +115,9 @@ export async function createQuiz(data: {
 }) {
   const supabase = await createClient();
   
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   // 1. Crear el Quiz
   const { data: quizIdData, error: quizError } = await supabase
@@ -158,6 +166,113 @@ export async function createQuiz(data: {
 }
 
 /**
+ * Actualiza un Quiz y sus Preguntas de forma masiva (Quiz Builder Edición)
+ */
+export async function updateQuiz(data: {
+  quizId: string;
+  title: string;
+  minScore: number;
+  questions: Array<{
+    questionText: string;
+    options: Array<{ id: string; text: string; feedback_clinical?: string }>;
+    correctOptionId: string;
+    score: number;
+    difficulty?: number;
+    is_critical?: boolean;
+    image_url?: string;
+    pearl?: string;
+    source_reference?: string;
+    findings?: Array<{ type: string; label: string; value: string }>;
+  }>;
+}) {
+  const supabase = await createClient();
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
+
+  // 1. Actualizar el Quiz
+  const { error: quizError } = await supabase
+    .from("quizzes")
+    .update({
+      title: data.title,
+      min_score_to_pass: data.minScore
+    })
+    .eq("id", data.quizId);
+
+  if (quizError) {
+    console.error("Quiz Update Error:", quizError);
+    return { success: false, error: quizError.message };
+  }
+
+  // 2. Borrar Preguntas Previas
+  const { error: deleteError } = await supabase
+    .from("questions")
+    .delete()
+    .eq("quiz_id", data.quizId);
+
+  if (deleteError) {
+    console.error("Questions Delete Error:", deleteError);
+    return { success: false, error: "Error borrando preguntas anteriores." };
+  }
+
+  // 3. Recrear las Preguntas
+  const questionsToInsert = data.questions.map((q, index) => ({
+    quiz_id: data.quizId,
+    question_text: q.questionText,
+    options: q.options,
+    correct_option_id: q.correctOptionId,
+    score: q.score,
+    order_index: index,
+    difficulty: q.difficulty || 1,
+    is_critical: q.is_critical || false,
+    image_url: q.image_url || null,
+    pearl: q.pearl || null,
+    source_reference: q.source_reference || null,
+    findings: q.findings || []
+  }));
+
+  const { error: qtError } = await supabase.from("questions").insert(questionsToInsert);
+
+  if (qtError) {
+    console.error("Question Insert Error:", qtError);
+    return { success: false, error: "Error re-insertando preguntas: " + qtError.message };
+  }
+
+  revalidatePath("/admin/contenido");
+  return { success: true, quizId: data.quizId };
+}
+
+/**
+ * Obtiene un Quiz completo (con preguntas y opciones) a partir de su lesson_id.
+ * Útil para cargar los valores iniciales en QuizBuilder.
+ */
+export async function getQuizByLessonId(lessonId: string) {
+  const supabase = await createClient();
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "No autorizado" };
+  }
+
+  const { data: quiz, error: quizError } = await supabase
+    .from("quizzes")
+    .select("*, questions(*)")
+    .eq("lesson_id", lessonId)
+    .single();
+
+  if (quizError || !quiz) {
+    return { success: false, error: quizError?.message || "Quiz no encontrado" };
+  }
+
+  // Ordenar las preguntas por order_index
+  if (quiz.questions) {
+    quiz.questions.sort((a: { order_index?: number }, b: { order_index?: number }) => (a.order_index || 0) - (b.order_index || 0));
+  }
+
+  return { success: true, data: quiz };
+}
+
+/**
  * Marca una lección como completada por el usuario, actualiza el puntaje.
  * Un trigger en PostgreSQL se encargará de recalcular el porcentaje del módulo y el certificado global.
  */
@@ -183,13 +298,63 @@ export async function completeLessonProgress(lessonId: string, score: number | n
   return { success: true };
 }
 
+/**
+ * Registra un intento de Quiz en el historial de intentos (quiz_attempts).
+ * Si el estudiante aprueba, también llama a completeLessonProgress internamente.
+ */
+export async function submitQuizAttempt({
+  lessonId,
+  quizId,
+  score,
+  passed
+}: {
+  lessonId: string;
+  quizId: string;
+  score: number;
+  passed: boolean;
+}) {
+  const supabase = await createClient();
+  const { data: user } = await supabase.auth.getUser();
+  if (!user?.user?.id) return { success: false, error: "No user found" };
+
+  // 1. Registrar el intento
+  const { error: attemptError } = await supabase.from("quiz_attempts").insert({
+    user_id: user.user.id,
+    quiz_id: quizId,
+    score: score,
+    passed: passed
+  });
+
+  if (attemptError) {
+    console.error("Error saving quiz attempt:", attemptError);
+    return { success: false, error: attemptError.message };
+  }
+
+  // 2. Si aprueba, aseguramos que la lección se marque completada en progress global
+  if (passed) {
+    const { error: progressError } = await supabase.from("lesson_progress").upsert({
+      user_id: user.user.id,
+      lesson_id: lessonId,
+      is_completed: true,
+      score: score,
+      completed_at: new Date().toISOString()
+    }, { onConflict: "user_id, lesson_id" });
+    
+    if (progressError) console.error("Error saving passed lesson_progress:", progressError);
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 // ====== MODULE MANAGEMENT ======
 
 export async function createMuxDirectUpload(module_id: string, title?: string) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "No tienes permiso para subir videos." };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "No tienes permiso para subir videos." };
+  }
 
   try {
     const upload = await mux.video.uploads.create({
@@ -226,9 +391,10 @@ export async function createMuxDirectUpload(module_id: string, title?: string) {
 
 export async function createDocumentLesson({ moduleId, title, documentUrl }: { moduleId: string; title: string; documentUrl: string }) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   // Insert the new document lesson
   const { data: newLesson, error } = await supabase.from("lessons").insert({
@@ -250,9 +416,10 @@ export async function createDocumentLesson({ moduleId, title, documentUrl }: { m
 
 export async function createModule(data: { title: string; description?: string; thumbnail_url?: string; prerequisite_module_id?: string | null }) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   const { error } = await supabase.from("modules").insert({
     title: data.title,
@@ -269,9 +436,10 @@ export async function createModule(data: { title: string; description?: string; 
 
 export async function updateModule(id: string, data: { title: string; description?: string; thumbnail_url?: string; prerequisite_module_id?: string | null }) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   const { error } = await supabase.from("modules").update({
     title: data.title,
@@ -287,12 +455,53 @@ export async function updateModule(id: string, data: { title: string; descriptio
 
 export async function deleteModule(id: string) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
+  // 1. Archivos huérfanos a limpiar de Storage
+  const { data: moduleData } = await supabase.from("modules").select("thumbnail_url, lessons(thumbnail_url, materials)").eq("id", id).single();
+  
+  const thumbnailsToDelete: string[] = [];
+  const docsToDelete: string[] = [];
+
+  if (moduleData) {
+    if (moduleData.thumbnail_url) {
+      const path = moduleData.thumbnail_url.split('/thumbnails/')[1];
+      if (path) thumbnailsToDelete.push(path);
+    }
+    if (moduleData.lessons && Array.isArray(moduleData.lessons)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      moduleData.lessons.forEach((lesson: { thumbnail_url?: string; materials?: any }) => {
+        if (lesson.thumbnail_url) {
+          const path = lesson.thumbnail_url.split('/thumbnails/')[1];
+          if (path) thumbnailsToDelete.push(path);
+        }
+        if (lesson.materials && Array.isArray(lesson.materials)) {
+          lesson.materials.forEach((mat: { url?: string }) => {
+            if (mat.url && mat.url.includes('/docs/')) {
+              const mPath = mat.url.split('/docs/')[1];
+              if (mPath) docsToDelete.push(mPath);
+            }
+          });
+        }
+      });
+    }
+  }
+
+  // 2. Eliminar de DB
   const { error } = await supabase.from("modules").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
+
+  // 3. Limpiar Storage
+  if (thumbnailsToDelete.length > 0) {
+    await supabase.storage.from("thumbnails").remove(thumbnailsToDelete);
+  }
+  if (docsToDelete.length > 0) {
+    await supabase.storage.from("docs").remove(docsToDelete);
+  }
+
   revalidatePath("/admin/contenido");
   return { success: true };
 }
@@ -301,9 +510,10 @@ export async function deleteModule(id: string) {
 
 export async function updateLesson(id: string, data: { title: string; description?: string; thumbnail_url?: string; is_published: boolean; materials?: Array<{title: string, url: string}>; duration_minutes?: number | null; difficulty?: string | null; prerequisite_lesson_id?: string | null }) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: any = {
@@ -329,21 +539,53 @@ export async function updateLesson(id: string, data: { title: string; descriptio
 
 export async function deleteLesson(id: string) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
+  // 1. Buscar Storage objects dependientes
+  const { data: lessonData } = await supabase.from("lessons").select("thumbnail_url, materials").eq("id", id).single();
+  const thumbnailsToDelete: string[] = [];
+  const docsToDelete: string[] = [];
+
+  if (lessonData) {
+    if (lessonData.thumbnail_url) {
+      const path = lessonData.thumbnail_url.split('/thumbnails/')[1];
+      if (path) thumbnailsToDelete.push(path);
+    }
+    if (lessonData.materials && Array.isArray(lessonData.materials)) {
+      lessonData.materials.forEach((mat: { url?: string }) => {
+        if (mat.url && mat.url.includes('/docs/')) {
+          const mPath = mat.url.split('/docs/')[1];
+          if (mPath) docsToDelete.push(mPath);
+        }
+      });
+    }
+  }
+
+  // 2. Eliminar de base de datos
   const { error } = await supabase.from("lessons").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
+
+  // 3. Eliminar archivos storage si se borró con éxito
+  if (thumbnailsToDelete.length > 0) {
+    await supabase.storage.from("thumbnails").remove(thumbnailsToDelete);
+  }
+  if (docsToDelete.length > 0) {
+    await supabase.storage.from("docs").remove(docsToDelete);
+  }
+
   revalidatePath("/admin/contenido");
   return { success: true };
 }
 
 export async function reorderLessons(lessonIds: string[]) {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.user?.id).single();
-  if (profile?.role !== 'admin') return { success: false, error: "Not an admin" };
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
 
   // Ejecutamos las promesas en paralelo para actualizar el `order_index` de todos los elementos afectados
   const promises = lessonIds.map((id, index) => 

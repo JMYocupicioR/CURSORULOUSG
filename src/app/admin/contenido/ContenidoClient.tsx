@@ -86,7 +86,8 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -205,6 +206,9 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<{ id: string, title: string, lesson_type: string, is_published: boolean, thumbnail_url: string, description: string, materials: Array<{title: string, url: string}>, duration_minutes: number | null, difficulty: string | null, prerequisite_lesson_id: string | null, mux_playback_id: string | null, mux_upload_id: string | null } | null>(null)
   const [isSubmittingLesson, setIsSubmittingLesson] = useState(false)
+  
+  // Quiz Builder Modal State (Editing)
+  const [editingQuizLessonId, setEditingQuizLessonId] = useState<string | null>(null)
 
   const handleOpenNewModule = () => {
     setEditingModule({ title: "", description: "", thumbnail_url: "", prerequisite_module_id: null })
@@ -249,8 +253,12 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
 
   const handleOpenEditLesson = (e: React.MouseEvent, lesson: Lesson) => {
     e.stopPropagation()
-    setEditingLesson({ id: lesson.id, title: lesson.title, lesson_type: lesson.lesson_type, is_published: lesson.is_published, thumbnail_url: lesson.thumbnail_url || "", description: lesson.description || "", materials: lesson.materials || [], duration_minutes: lesson.duration_minutes || null, difficulty: lesson.difficulty || null, prerequisite_lesson_id: lesson.prerequisite_lesson_id || null, mux_playback_id: lesson.mux_playback_id || null, mux_upload_id: lesson.mux_upload_id || null })
-    setIsLessonModalOpen(true)
+    if (lesson.lesson_type === 'quiz') {
+      setEditingQuizLessonId(lesson.id)
+    } else {
+      setEditingLesson({ id: lesson.id, title: lesson.title, lesson_type: lesson.lesson_type, is_published: lesson.is_published, thumbnail_url: lesson.thumbnail_url || "", description: lesson.description || "", materials: lesson.materials || [], duration_minutes: lesson.duration_minutes || null, difficulty: lesson.difficulty || null, prerequisite_lesson_id: lesson.prerequisite_lesson_id || null, mux_playback_id: lesson.mux_playback_id || null, mux_upload_id: lesson.mux_upload_id || null })
+      setIsLessonModalOpen(true)
+    }
   }
 
   const handleSaveLesson = async () => {
@@ -807,6 +815,15 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* Quiz Builder for Editing */}
+      {editingQuizLessonId && (
+        <QuizBuilder 
+          modules={localModules} 
+          editLessonId={editingQuizLessonId} 
+          onCloseEdit={() => setEditingQuizLessonId(null)} 
+        />
+      )}
 
     </div>
   )

@@ -137,6 +137,26 @@ export async function getUserLessonProgress(lessonId: string) {
   return data;
 }
 
+export async function getUserCompletedLessons(): Promise<string[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("lesson_progress")
+    .select("lesson_id")
+    .eq("user_id", user.id)
+    .eq("is_completed", true);
+
+  if (error) {
+    console.error("Error fetching completed lessons:", error);
+    return [];
+  }
+
+  return data.map(d => d.lesson_id);
+}
+
 export async function getLessonQuiz(lessonId: string) {
   const supabase = await createClient();
   
@@ -159,4 +179,34 @@ export async function getLessonQuiz(lessonId: string) {
   if (qError) return null;
   
   return { ...quiz, questions };
+}
+
+export type MicroLesson = {
+  id: string;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  category: string;
+  thumbnail_url: string | null;
+  video_url: string | null;
+  is_published: boolean;
+  created_at: string;
+}
+
+export async function getMicroLessons(onlyPublished = true): Promise<MicroLesson[]> {
+  const supabase = await createClient();
+  let query = supabase.from("micro_lessons").select("*").order("created_at", { ascending: false });
+  
+  if (onlyPublished) {
+    query = query.eq("is_published", true);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching micro lessons:", error);
+    return [];
+  }
+
+  return data as MicroLesson[];
 }

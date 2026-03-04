@@ -18,6 +18,7 @@ const adminNavItems = [
   { href: "/admin", icon: "space_dashboard", label: "Dashboard" },
   { href: "/admin/alumnos", icon: "school", label: "Gestión de Alumnos" },
   { href: "/admin/contenido", icon: "video_library", label: "Contenido del Curso" },
+  { href: "/admin/microlearning", icon: "bolt", label: "Micro-Aprendizaje" },
   { href: "/admin/certificados", icon: "workspace_premium", label: "Certificados" },
 ]
 
@@ -37,7 +38,7 @@ export function AdminSidebar({ userProfile }: { userProfile: UserProfile | null 
   const initials = getInitials(userProfile?.full_name)
 
   return (
-    <aside className="w-72 bg-[#0a1628] text-white hidden md:flex flex-col flex-shrink-0 relative overflow-y-auto z-20 shadow-2xl font-body sidebar-scroll">
+    <aside className="w-72 bg-[#0a1628] text-white hidden md:flex flex-col shrink-0 relative overflow-y-auto z-20 shadow-2xl font-body sidebar-scroll">
       {/* Logo Section */}
       <div className="p-6 flex flex-col items-center border-b border-white/5">
         <Logo showSubtitle />
@@ -46,7 +47,7 @@ export function AdminSidebar({ userProfile }: { userProfile: UserProfile | null 
       {/* User Profile Card */}
       <div className="px-5 py-4 border-b border-white/5">
         <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-cyan-400 flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
+          <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-cyan-400 flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
             <span className="text-sm font-bold text-white">{initials}</span>
           </div>
           <div className="overflow-hidden">

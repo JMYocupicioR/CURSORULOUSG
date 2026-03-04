@@ -73,6 +73,7 @@ export type Database = {
           mux_asset_id?: string | null
           mux_playback_id?: string | null
           mux_upload_id?: string | null
+          prerequisite_lesson_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -90,6 +91,7 @@ export type Database = {
           mux_asset_id?: string | null
           mux_playback_id?: string | null
           mux_upload_id?: string | null
+          prerequisite_lesson_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -107,6 +109,7 @@ export type Database = {
           mux_asset_id?: string | null
           mux_playback_id?: string | null
           mux_upload_id?: string | null
+          prerequisite_lesson_id?: string | null
         }
         Relationships: [
           {
@@ -126,6 +129,7 @@ export type Database = {
           is_published: boolean | null
           order_index: number | null
           title: string
+          prerequisite_module_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -134,6 +138,7 @@ export type Database = {
           is_published?: boolean | null
           order_index?: number | null
           title: string
+          prerequisite_module_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -142,6 +147,7 @@ export type Database = {
           is_published?: boolean | null
           order_index?: number | null
           title?: string
+          prerequisite_module_id?: string | null
         }
         Relationships: []
       }
@@ -186,6 +192,48 @@ export type Database = {
           state?: string | null
         }
         Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          passed: boolean
+          quiz_id: string | null
+          score: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          passed?: boolean
+          quiz_id?: string | null
+          score: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          passed?: boolean
+          quiz_id?: string | null
+          score?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

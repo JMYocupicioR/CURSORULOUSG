@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
 // Dynamically import PDFDownloadLink to avoid SSR issues
@@ -160,10 +161,12 @@ const CertificateDocument = ({ studentName, date }: { studentName: string, date:
 
 export function CertificateGenerator({ 
   studentName = "Estudiante", 
-  date = new Date().toISOString() 
+  date = new Date().toISOString(),
+  className
 }: { 
   studentName?: string, 
-  date?: string 
+  date?: string,
+  className?: string 
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -182,7 +185,10 @@ export function CertificateGenerator({
     <PDFDownloadLink
       document={<CertificateDocument studentName={studentName} date={date} />}
       fileName={`Certificado_DrRaulMorales_${studentName.replace(/\s+/g, '_')}.pdf`}
-      className="flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-violet-600 to-primary text-white font-bold rounded-2xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
+      className={cn(
+        "flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-violet-600 to-primary text-white font-bold rounded-2xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20",
+        className
+      )}
     >
       {/* react-pdf requires a child function or component for PDFDownloadLink to show status */}
       {({ loading }) => (loading ? (

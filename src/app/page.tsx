@@ -41,7 +41,7 @@ export default function LandingPage() {
             <Link className="text-slate-300 hover:text-white text-sm font-medium transition-colors" href="/temario">Temario</Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/login">
+            <Link href="/checkout">
                 <Button className="hidden sm:flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-bold text-white transition hover:bg-primary/90">
                     Inscribirme Ahora
                 </Button>
@@ -57,7 +57,7 @@ export default function LandingPage() {
                   <Link href="#program" className="text-slate-300 hover:text-white text-sm font-medium transition-colors" onClick={() => setMobileMenuOpen(false)}>Programa</Link>
                   <Link href="#methodology" className="text-slate-300 hover:text-white text-sm font-medium transition-colors" onClick={() => setMobileMenuOpen(false)}>Metodología</Link>
                   <Link href="/temario" className="text-slate-300 hover:text-white text-sm font-medium transition-colors" onClick={() => setMobileMenuOpen(false)}>Temario</Link>
-                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Link href="/checkout" onClick={() => setMobileMenuOpen(false)}>
                     <Button className="w-full h-10 rounded-lg bg-primary text-white font-bold text-sm">Inscribirme Ahora</Button>
                   </Link>
                 </nav>
@@ -96,7 +96,7 @@ export default function LandingPage() {
                 Domina procedimientos guiados por ecografía con entrenamiento clínico aplicado, casos reales y metodología de alta precisión. Eleva tu práctica con un programa estructurado para resultados medibles.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/login">
+                <Link href="/checkout">
                   <button className="h-12 px-8 rounded-lg bg-primary text-white font-bold text-base transition-all hover:bg-blue-600 hover:shadow-[0_0_20px_rgba(23,115,207,0.5)] flex items-center justify-center gap-2 w-full sm:w-auto">
                     <span>Inscribirme Ahora</span>
                     <ArrowRight className="w-4 h-4" />
@@ -306,7 +306,7 @@ export default function LandingPage() {
               Únete a la próxima cohorte de especialistas en rehabilitación intervencionista. Plazas limitadas para el próximo semestre.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link href="/login">
+              <Link href="/checkout">
                 <button className="rounded-lg bg-white px-8 py-4 text-base font-bold text-primary shadow-lg transition-transform hover:scale-105">
                   Inscribirme Ahora
                 </button>
