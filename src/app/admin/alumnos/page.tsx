@@ -14,7 +14,7 @@ export default async function AlumnosPage() {
   // Obtener alumnos (asegurarse de incluir los que tienen role null)
   const { data: studentsData } = await supabase
     .from("profiles")
-    .select("id, full_name, email, specialty, state, created_at")
+    .select("id, full_name, email, specialty, state, created_at, is_active")
     .or("role.neq.admin,role.is.null")
     .order("created_at", { ascending: false })
   
@@ -95,7 +95,8 @@ export default async function AlumnosPage() {
       enrollDate: student.created_at,
       lastAccess: "Acceso Activo",
       globalGrade: evalModules > 0 ? Math.round(totalScoreSum / evalModules) : null,
-      moduleGrades
+      moduleGrades,
+      isActive: student.is_active ?? false,
     }
   })
 

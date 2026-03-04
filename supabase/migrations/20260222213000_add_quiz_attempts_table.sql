@@ -1,6 +1,6 @@
 -- Tabla para registrar cada intento de un estudiante en un quiz
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     quiz_id UUID REFERENCES public.quizzes(id) ON DELETE CASCADE,
     score INTEGER NOT NULL,

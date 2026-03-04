@@ -77,11 +77,12 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single()
 
     const isAdmin = profile?.role === 'admin'
+    const isActive = profile?.is_active === true
 
     // Admin accessing student dashboard → redirect to admin panel
     if (isAdmin && pathname.startsWith('/dashboard')) {
@@ -91,6 +92,14 @@ export async function middleware(request: NextRequest) {
     // Non-admin accessing admin routes → redirect to student dashboard
     if (!isAdmin && pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Inactive students accessing course content → redirect to pending page
+    const studentContentRoutes = ['/dashboard', '/courses', '/lessons', '/microlearning', '/community', '/progress', '/certificates', '/profile']
+    const isStudentContentRoute = studentContentRoutes.some(route => pathname.startsWith(route))
+
+    if (!isAdmin && !isActive && isStudentContentRoute && pathname !== '/pending') {
+      return NextResponse.redirect(new URL('/pending', request.url))
     }
   }
 

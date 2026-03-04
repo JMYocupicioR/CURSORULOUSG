@@ -210,3 +210,57 @@ export async function getMicroLessons(onlyPublished = true): Promise<MicroLesson
 
   return data as MicroLesson[];
 }
+
+// ============================================================
+// CERTIFICATE CONFIG
+// ============================================================
+export async function getCertificateConfig() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("certificate_config")
+    .select("*")
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error("Error fetching certificate config:", error);
+  }
+
+  return data ?? null;
+}
+
+// ============================================================
+// ALL ISSUED CERTIFICATES (ADMIN)
+// ============================================================
+export async function getCertificatesList() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("certificates")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching certificates list:", error.message, error.code, error.details, error.hint);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+// ============================================================
+// SINGLE CERTIFICATE BY FOLIO (PUBLIC)
+// ============================================================
+export async function getCertificateByFolio(folio: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("certificates")
+    .select("*")
+    .eq("folio", folio)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error("Error fetching certificate by folio:", error);
+  }
+
+  return data ?? null;
+}
