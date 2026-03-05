@@ -6,15 +6,7 @@ import { saveCertificateConfig, issueCertificate, deleteCertificate, type Certif
 import CertificateDesigner, { DEFAULT_LAYOUT } from "@/components/certificates/CertificateDesigner"
 import dynamic from "next/dynamic"
 
-// Dynamically import PDF-related stuff (client-only)
-const PDFDownloadLink = dynamic(
-  () => import("@react-pdf/renderer").then((m) => m.PDFDownloadLink),
-  { ssr: false }
-)
-const CertificatePDF = dynamic(
-  () => import("@/components/certificates/CertificatePDF").then((m) => m.CertificatePDF),
-  { ssr: false }
-)
+// PDF generation is handled async inside DownloadPdfButton component.
 
 // ─────────────────────────────────────────────────
 // TYPES
@@ -316,31 +308,17 @@ export default function CertificadosClient({ initialConfig, initialCertificates 
 
             {/* Download button for just-issued certificate */}
             {mounted && issuedForPdf && qrDataUrl && (
-              <PDFDownloadLink
-                document={
-                  <CertificatePDF
-                    recipientName={issuedForPdf.recipient_name}
-                    courseName={issuedForPdf.course_name}
-                    courseHours={issuedForPdf.course_hours ?? ""}
-                    institutionalText={institutionalText}
-                    folio={issuedForPdf.folio}
-                    issueDate={issuedForPdf.issue_date}
-                    issuedBy={issuedForPdf.issued_by}
-                    qrDataUrl={qrDataUrl}
-                    signers={[{ name: "Dr. Raúl Morales", role: "Director del Curso" }]}
-                    primaryColor={primaryColor}
-                    elementLayout={elementLayout}
-                    backgroundUrl={backgroundUrl}
-                  />
-                }
-                fileName={`Certificado_${issuedForPdf.folio}.pdf`}
+              <DownloadPdfButton
+                cert={issuedForPdf}
+                institutionalText={institutionalText}
+                primaryColor={primaryColor}
+                elementLayout={elementLayout}
+                backgroundUrl={backgroundUrl}
+                qrDataUrl={qrDataUrl}
                 className="flex items-center gap-2 px-5 py-2.5 bg-primary/10 text-primary border border-primary/30 rounded-xl text-sm font-semibold hover:bg-primary/20 transition-colors"
-              >
-                {({ loading }) => loading
-                  ? <><span className="material-symbols-outlined text-base animate-spin">progress_activity</span> Generando PDF...</>
-                  : <><span className="material-symbols-outlined text-base">download</span> Descargar PDF</>
-                }
-              </PDFDownloadLink>
+                buttonContent={<><span className="material-symbols-outlined text-base">download</span> Descargar PDF</>}
+                loadingContent={<><span className="material-symbols-outlined text-base animate-spin">progress_activity</span> Generando PDF...</>}
+              />
             )}
           </div>
         </div>
@@ -463,31 +441,17 @@ function CertificateRow({
         <div className="flex items-center gap-2">
           {/* PDF Download */}
           {mounted && qr && (
-            <PDFDownloadLink
-              document={
-                <CertificatePDF
-                  recipientName={cert.recipient_name}
-                  courseName={cert.course_name}
-                  courseHours={cert.course_hours ?? ""}
-                  institutionalText={institutionalText}
-                  folio={cert.folio}
-                  issueDate={cert.issue_date}
-                  issuedBy={cert.issued_by}
-                  qrDataUrl={qr}
-                  signers={[{ name: "Dr. Raúl Morales", role: "Director del Curso" }]}
-                  primaryColor={primaryColor}
-                  elementLayout={elementLayout}
-                  backgroundUrl={backgroundUrl}
-                />
-              }
-              fileName={`Certificado_${cert.folio}.pdf`}
+            <DownloadPdfButton
+              cert={cert}
+              institutionalText={institutionalText}
+              primaryColor={primaryColor}
+              elementLayout={elementLayout}
+              backgroundUrl={backgroundUrl}
+              qrDataUrl={qr}
               className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-semibold hover:bg-primary/20 transition-colors whitespace-nowrap"
-            >
-              {({ loading }) => loading
-                ? <><span className="material-symbols-outlined text-sm">progress_activity</span></>
-                : <><span className="material-symbols-outlined text-sm">download</span> PDF</>
-              }
-            </PDFDownloadLink>
+              buttonContent={<><span className="material-symbols-outlined text-sm">download</span> PDF</>}
+              loadingContent={<><span className="material-symbols-outlined text-sm animate-spin">progress_activity</span></>}
+            />
           )}
 
           {/* Verify link */}
@@ -509,3 +473,80 @@ function CertificateRow({
     </tr>
   )
 }
+
+// ─────────────────────────────────────────────────
+// ASYNC PDF DOWNLOAD BUTTON
+// ─────────────────────────────────────────────────
+function DownloadPdfButton({
+  cert,
+  institutionalText,
+  primaryColor,
+  elementLayout,
+  backgroundUrl,
+  qrDataUrl,
+  className,
+  buttonContent,
+  loadingContent,
+}: {
+  cert: IssuedCertificate
+  institutionalText: string
+  primaryColor: string
+  elementLayout: ElementLayoutMap
+  backgroundUrl: string
+  qrDataUrl: string
+  className?: string
+  buttonContent: React.ReactNode
+  loadingContent: React.ReactNode
+}) {
+  const [loading, setLoading] = useState(false)
+
+  const handleDownload = async () => {
+    if (loading) return
+    setLoading(true)
+    try {
+      const [{ pdf }, { CertificatePDF }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/certificates/CertificatePDF"),
+      ])
+
+      const doc = (
+        <CertificatePDF
+          recipientName={cert.recipient_name}
+          courseName={cert.course_name}
+          courseHours={cert.course_hours ?? ""}
+          institutionalText={institutionalText}
+          folio={cert.folio}
+          issueDate={cert.issue_date}
+          issuedBy={cert.issued_by}
+          qrDataUrl={qrDataUrl}
+          signers={[{ name: "Dr. Raúl Morales", role: "Director del Curso" }]}
+          primaryColor={primaryColor}
+          elementLayout={elementLayout}
+          backgroundUrl={backgroundUrl}
+        />
+      )
+
+      const blob = await pdf(doc).toBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `Certificado_${cert.folio}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Error generating PDF:", err)
+      alert("Hubo un error al generar el PDF.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button onClick={handleDownload} disabled={loading} className={className}>
+      {loading ? loadingContent : buttonContent}
+    </button>
+  )
+}
+

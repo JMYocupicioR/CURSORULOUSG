@@ -5,12 +5,7 @@ import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
-// Dynamically import PDFDownloadLink to avoid SSR issues
-const PDFDownloadLink = dynamic(
-  () => import('@react-pdf/renderer').then(mod => mod.PDFDownloadLink),
-  { ssr: false }
-);
-
+// PDF components imported statically. pdf renderer imported dynamically on click.
 // Formateo de fecha
 const formatDate = (dateString?: string) => {
   if (!dateString) return new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -169,6 +164,7 @@ export function CertificateGenerator({
   className?: string 
 }) {
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -181,17 +177,41 @@ export function CertificateGenerator({
     </div>
   );
 
+  const handleDownload = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const doc = <CertificateDocument studentName={studentName} date={date} />;
+      const blob = await pdf(doc).toBlob();
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Certificado_DrRaulMorales_${studentName.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error generating student certificate:", err);
+      alert("Hubo un error al generar el PDF del certificado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <PDFDownloadLink
-      document={<CertificateDocument studentName={studentName} date={date} />}
-      fileName={`Certificado_DrRaulMorales_${studentName.replace(/\s+/g, '_')}.pdf`}
+    <button
+      onClick={handleDownload}
+      disabled={loading}
       className={cn(
         "flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-violet-600 to-primary text-white font-bold rounded-2xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20",
-        className
+        className,
+        loading ? "opacity-70 cursor-not-allowed" : ""
       )}
     >
-      {/* react-pdf requires a child function or component for PDFDownloadLink to show status */}
-      {({ loading }) => (loading ? (
+      {loading ? (
         <>
           <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
           Generando PDF...
@@ -201,7 +221,8 @@ export function CertificateGenerator({
           <span className="material-symbols-outlined text-base">workspace_premium</span>
           ¡Descargar Certificado!
         </>
-      ))}
-    </PDFDownloadLink>
+      )}
+    </button>
   );
 }
+
