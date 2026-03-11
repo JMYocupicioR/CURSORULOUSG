@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useMemo } from "react"
 import { AdminHeader } from "@/components/admin/AdminHeader"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -83,6 +83,10 @@ function AccessBadge({ isActive }: { isActive: boolean }) {
   )
 }
 
+type StatusFilter = "all" | "active" | "pending" | "completed" | "inactive"
+type SortField = "name" | "progress" | "date" | "grade"
+type SortOrder = "asc" | "desc"
+
 export function AlumnosClient({ students, stats }: { students: StudentDetail[]; stats: Stats }) {
   const [selectedStudent, setSelectedStudent] = useState<StudentDetail | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -93,6 +97,46 @@ export function AlumnosClient({ students, stats }: { students: StudentDetail[]; 
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"all" | "requests">(stats.accessRequests > 0 ? "requests" : "all")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [specialtyFilter, setSpecialtyFilter] = useState<string>("all")
+  const [sortField, setSortField] = useState<SortField>("date")
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Compute unique specialties for the filter dropdown
+  const specialties = useMemo(() => {
+    const set = new Set<string>()
+    localStudents.forEach(s => {
+      if (s.specialty && s.specialty !== "No especificada") set.add(s.specialty)
+    })
+    return Array.from(set).sort()
+  }, [localStudents])
+
+  // Export filtered results as CSV
+  const exportCSV = () => {
+    const headers = ["Nombre", "Email", "Especialidad", "Estado", "Progreso", "Calificación", "Ciudad", "Teléfono", "Cédula", "Fecha de Inscripción", "Acceso"]
+    const rows = filtered.map(s => [
+      s.name,
+      s.email,
+      s.specialty,
+      s.status === "completed" ? "Certificado" : s.status === "active" ? "En Progreso" : "Pendiente",
+      `${s.progress}%`,
+      s.globalGrade !== null ? `${s.globalGrade}%` : "N/A",
+      s.city,
+      s.phone || "N/A",
+      s.licenseId || "N/A",
+      s.enrollDate ? new Date(s.enrollDate).toLocaleDateString("es-MX") : "N/A",
+      s.isActive ? "Activo" : "Inactivo",
+    ])
+    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n")
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `alumnos_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const handleToggleStatus = (student: StudentDetail) => {
     const newIsActive = !student.isActive
@@ -152,11 +196,81 @@ export function AlumnosClient({ students, stats }: { students: StudentDetail[]; 
     { label: "Solicitudes", value: pendingRequests.length, icon: "person_add", gradient: pendingRequests.length > 0 ? "from-orange-500/30 to-orange-500/5" : "from-amber-500/30 to-amber-500/5", iconColor: pendingRequests.length > 0 ? "text-orange-400" : "text-amber-400" },
   ]
 
-  const filtered = (activeTab === "requests" ? pendingRequests : allStudents).filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.specialty.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filter + Sort pipeline
+  const filtered = useMemo(() => {
+    const baseList = activeTab === "requests" ? pendingRequests : allStudents
+
+    // 1. Text search
+    let result = baseList.filter(s =>
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.city && s.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (s.phone && s.phone.includes(searchTerm))
+    )
+
+    // 2. Status filter (only on "all" tab)
+    if (activeTab === "all" && statusFilter !== "all") {
+      switch (statusFilter) {
+        case "active":
+          result = result.filter(s => s.isActive && s.status === "active")
+          break
+        case "completed":
+          result = result.filter(s => s.status === "completed")
+          break
+        case "pending":
+          result = result.filter(s => s.isActive && s.status === "pending")
+          break
+        case "inactive":
+          result = result.filter(s => !s.isActive)
+          break
+      }
+    }
+
+    // 3. Specialty filter
+    if (specialtyFilter !== "all") {
+      result = result.filter(s => s.specialty === specialtyFilter)
+    }
+
+    // 4. Sort
+    result.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case "name":
+          cmp = a.name.localeCompare(b.name, "es")
+          break
+        case "progress":
+          cmp = a.progress - b.progress
+          break
+        case "date":
+          cmp = new Date(a.enrollDate).getTime() - new Date(b.enrollDate).getTime()
+          break
+        case "grade":
+          cmp = (a.globalGrade ?? -1) - (b.globalGrade ?? -1)
+          break
+      }
+      return sortOrder === "desc" ? -cmp : cmp
+    })
+
+    return result
+  }, [activeTab, pendingRequests, allStudents, searchTerm, statusFilter, specialtyFilter, sortField, sortOrder])
+
+  const activeFiltersCount = (statusFilter !== "all" ? 1 : 0) + (specialtyFilter !== "all" ? 1 : 0)
+
+  const clearAllFilters = () => {
+    setStatusFilter("all")
+    setSpecialtyFilter("all")
+    setSearchTerm("")
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortOrder(field === "name" ? "asc" : "desc")
+    }
+  }
 
   const handleDelete = async (student: StudentDetail) => {
     setIsDeleting(true)
@@ -232,21 +346,144 @@ export function AlumnosClient({ students, stats }: { students: StudentDetail[]; 
           </button>
         </div>
 
-        {/* Search */}
-        <div className="bg-white/5 rounded-xl border border-white/8 px-4 py-2.5 flex items-center gap-2.5">
-          <span className="material-symbols-outlined text-gray-400 text-lg shrink-0">search</span>
-          <input
-            type="text"
-            placeholder="Buscar por nombre, email o especialidad..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none w-full"
-          />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="text-gray-500 hover:text-gray-300 transition-colors">
-              <span className="material-symbols-outlined text-lg">close</span>
+        {/* Search + Filter Bar */}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            {/* Search input */}
+            <div className="flex-1 bg-white/5 rounded-xl border border-white/8 px-4 py-2.5 flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-gray-400 text-lg shrink-0">search</span>
+              <input
+                type="text"
+                placeholder="Buscar por nombre, email, especialidad, ciudad o teléfono..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-transparent text-sm text-gray-200 placeholder-gray-500 outline-none w-full"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm("")} className="text-gray-500 hover:text-gray-300 transition-colors">
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Filter toggle */}
+            <button
+              onClick={() => setShowFilters(prev => !prev)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all shrink-0 ${
+                showFilters || activeFiltersCount > 0
+                  ? "bg-primary/15 border-primary/30 text-primary"
+                  : "bg-white/5 border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15"
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">tune</span>
+              Filtros
+              {activeFiltersCount > 0 && (
+                <span className="bg-primary text-white text-[10px] font-black rounded-full w-4.5 h-4.5 flex items-center justify-center min-w-[18px]">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
+
+            {/* Export CSV */}
+            <button
+              onClick={exportCSV}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border bg-white/5 border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15 text-sm font-semibold transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Exportar a CSV"
+            >
+              <span className="material-symbols-outlined text-base">download</span>
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+          </div>
+
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="bg-white/3 rounded-xl border border-white/8 p-4 flex flex-wrap gap-3 items-end animate-in slide-in-from-top-2 duration-200">
+              {/* Status Filter */}
+              {activeTab === "all" && (
+                <div className="flex flex-col gap-1.5 min-w-[160px]">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Estado</label>
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+                    className="bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 px-3 py-2 outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="active">En Progreso</option>
+                    <option value="completed">Certificados</option>
+                    <option value="pending">Sin inicio</option>
+                    <option value="inactive">Inactivos</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Specialty Filter */}
+              <div className="flex flex-col gap-1.5 min-w-[180px]">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Especialidad</label>
+                <select
+                  value={specialtyFilter}
+                  onChange={e => setSpecialtyFilter(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 px-3 py-2 outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="all">Todas las especialidades</option>
+                  {specialties.map(sp => (
+                    <option key={sp} value={sp}>{sp}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort */}
+              <div className="flex flex-col gap-1.5 min-w-[160px]">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Ordenar por</label>
+                <div className="flex">
+                  <select
+                    value={sortField}
+                    onChange={e => handleSort(e.target.value as SortField)}
+                    className="bg-white/5 border border-white/10 rounded-l-lg text-sm text-gray-200 px-3 py-2 outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer flex-1"
+                  >
+                    <option value="date">Fecha de inscripción</option>
+                    <option value="name">Nombre</option>
+                    <option value="progress">Progreso</option>
+                    <option value="grade">Calificación</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                    className="bg-white/5 border border-white/10 border-l-0 rounded-r-lg px-2.5 text-gray-400 hover:text-gray-200 transition-colors"
+                    title={sortOrder === "asc" ? "Ascendente" : "Descendente"}
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      {sortOrder === "asc" ? "arrow_upward" : "arrow_downward"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Clear filters */}
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors self-end"
+                >
+                  <span className="material-symbols-outlined text-sm">filter_alt_off</span>
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
           )}
+
+          {/* Result count */}
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <span>{filtered.length} de {(activeTab === "requests" ? pendingRequests : allStudents).length} alumnos</span>
+              {(searchTerm || activeFiltersCount > 0) && (
+                <span className="text-primary/70">• filtrado</span>
+              )}
+            </div>
+            <span className="text-gray-600">
+              Ordenado por {sortField === "date" ? "fecha" : sortField === "name" ? "nombre" : sortField === "progress" ? "progreso" : "calificación"}
+              {" "}{sortOrder === "asc" ? "↑" : "↓"}
+            </span>
+          </div>
         </div>
 
         {/* Content area */}
