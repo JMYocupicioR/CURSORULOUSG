@@ -2,6 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import Mux from "@mux/mux-node";
+
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID!,
+  tokenSecret: process.env.MUX_TOKEN_SECRET!,
+});
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -80,8 +86,42 @@ export async function deleteMicroLesson(id: string) {
     return { success: false, error: "Not an admin" };
   }
 
-  // Si hubiera que limpiar imagenes de storage, lo haríamos acá buscando el row primero
-  
+  // 1. Fetch the lesson to get video_url (Mux playback ID) before deleting
+  const { data: lesson } = await supabase
+    .from("micro_lessons")
+    .select("video_url, thumbnail_url")
+    .eq("id", id)
+    .single();
+
+  // 2. If there's a Mux playback ID, find and delete the asset from Mux
+  if (lesson?.video_url) {
+    try {
+      // video_url contains either a Mux playback ID or a full URL
+      const playbackId = lesson.video_url.startsWith("http")
+        ? null // It's an external URL, not a Mux asset
+        : lesson.video_url;
+
+      if (playbackId) {
+        // List assets filtered by this playback ID to find the asset_id
+        const assets = await mux.video.assets.list();
+        const matchingAsset = assets.data?.find((a: { playback_ids?: Array<{ id: string }> }) =>
+          a.playback_ids?.some((p: { id: string }) => p.id === playbackId)
+        );
+
+        if (matchingAsset) {
+          await mux.video.assets.delete(matchingAsset.id);
+          console.log(`[Mux] Micro-lesson asset ${matchingAsset.id} eliminado correctamente`);
+        } else {
+          console.warn(`[Mux] No se encontró asset para playback ID: ${playbackId}`);
+        }
+      }
+    } catch (muxErr) {
+      console.warn(`[Mux] No se pudo eliminar asset de micro-lección:`, muxErr);
+      // Don't block the DB delete if Mux cleanup fails
+    }
+  }
+
+  // 3. Delete from database
   const { error } = await supabase.from("micro_lessons").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
@@ -89,3 +129,4 @@ export async function deleteMicroLesson(id: string) {
   revalidatePath("/dashboard");
   return { success: true };
 }
+
