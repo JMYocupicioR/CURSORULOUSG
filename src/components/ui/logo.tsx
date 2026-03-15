@@ -1,5 +1,6 @@
 
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface LogoProps extends React.HTMLAttributes<HTMLDivElement> {
   /** "dark" for dark backgrounds (white text), "light" for light backgrounds (dark text) */
@@ -9,7 +10,6 @@ interface LogoProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Show "ECOGRAFÍA NEUROMUSCULOESQUELÉTICA" subtitle */
   showSubtitle?: boolean
   iconClassName?: string
-  textClassName?: string
 }
 
 export function Logo({
@@ -18,65 +18,33 @@ export function Logo({
   compact = false,
   showSubtitle = false,
   iconClassName,
-  textClassName,
   ...props
 }: LogoProps) {
-  const secondaryTextColor =
-    variant === "dark" ? "text-white" : "text-slate-900 dark:text-white"
-
   if (compact) {
     return (
       <div className={cn("flex items-center gap-2", className)} {...props}>
-        <span
-          className={cn(
-            "material-symbols-outlined text-2xl text-primary",
-            iconClassName
-          )}
-        >
-          sensors
-        </span>
-        <div className={cn("flex items-baseline gap-1.5", textClassName)}>
-          <span className="font-bold text-base tracking-tight text-primary leading-none">
-            Dr. Raúl
-          </span>
-          <span
-            className={cn(
-              "font-bold text-lg tracking-tight leading-none",
-              secondaryTextColor
-            )}
-          >
-            Morales
-          </span>
-        </div>
+        <Image
+          src="/logos/raulmoralescolor.png"
+          alt="Dr. Raúl Morales"
+          width={120}
+          height={48}
+          className={cn("h-8 w-auto object-contain", iconClassName)}
+          priority
+        />
       </div>
     )
   }
 
   return (
     <div className={cn("flex flex-col items-center", className)} {...props}>
-      <div className="flex items-center gap-3">
-        <span
-          className={cn(
-            "material-symbols-outlined text-4xl text-primary",
-            iconClassName
-          )}
-        >
-          sensors
-        </span>
-        <div className={cn("flex flex-col", textClassName)}>
-          <h1 className="font-bold text-xl tracking-tight leading-none text-primary">
-            Dr. Raúl
-          </h1>
-          <h1
-            className={cn(
-              "font-bold text-2xl tracking-tight leading-none",
-              secondaryTextColor
-            )}
-          >
-            Morales
-          </h1>
-        </div>
-      </div>
+      <Image
+        src="/logos/raulmoralescolor.png"
+        alt="Dr. Raúl Morales – Ecografía Neuromusculoesquelética Intervencionista"
+        width={280}
+        height={140}
+        className={cn("w-auto object-contain", iconClassName)}
+        priority
+      />
       {showSubtitle && (
         <p
           className={cn(

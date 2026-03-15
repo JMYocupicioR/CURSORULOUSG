@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "DiplomadoRaulMorales - Rehabilitación Intervencionista",
   description: "Plataforma educativa médica de alto rendimiento",
+  openGraph: {
+    title: "Dr. Raúl Morales – Ecografía Neuromusculoesquelética",
+    description: "Plataforma educativa médica de alto rendimiento",
+    images: ["/logos/raulmoralescolor.png"],
+  },
 };
 
 export default function RootLayout({

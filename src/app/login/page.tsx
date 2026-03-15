@@ -35,14 +35,10 @@ function LoginContent() {
           
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center space-y-4">
-            <div className="flex items-center gap-3 group px-4 py-2 rounded-2xl transition-all duration-300">
+            <div className="flex items-center justify-center group px-4 py-2 rounded-2xl transition-all duration-300">
                <div className="relative">
                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-150 group-hover:scale-200 transition-transform duration-500" />
-                 <span className="material-symbols-outlined text-4xl text-primary relative z-10 animate-pulse-slow">sensors</span>
-               </div>
-               <div className="flex flex-col items-start translate-y-0.5">
-                  <span className="text-xl font-black tracking-tighter leading-none text-slate-900 dark:text-white">DR. RAÚL</span>
-                  <span className="text-xl font-black tracking-tighter leading-none text-primary -mt-1">MORALES</span>
+                 <img src="/logos/raulmoralescolor.png" alt="Dr. Raúl Morales" className="h-16 w-auto object-contain relative z-10" />
                </div>
             </div>
             <div className="space-y-2">
