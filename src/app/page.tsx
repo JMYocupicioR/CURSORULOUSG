@@ -19,12 +19,7 @@ import {
   Hand, 
   Footprints, 
   Syringe, 
-  Download,
-  Hospital,
-  GraduationCap,
-  FlaskConical,
-  Dna,
-  HeartPulse
+  Download
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -184,13 +179,20 @@ export default function LandingPage() {
         {/* Partners Section */}
         <section className="border-y border-surface-highlight bg-surface-dark py-10">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <p className="text-center text-sm font-medium text-slate-500 mb-6 uppercase tracking-widest">Respaldo Científico Por</p>
-            <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5 items-center justify-items-center opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-              <div className="flex items-center gap-2 font-bold text-xl text-white"><Hospital className="w-8 h-8" />ASOC_MED</div>
-              <div className="flex items-center gap-2 font-bold text-xl text-white"><GraduationCap className="w-8 h-8" />UNIV_INTL</div>
-              <div className="flex items-center gap-2 font-bold text-xl text-white"><FlaskConical className="w-8 h-8" />CONSEJO_CI</div>
-              <div className="flex items-center gap-2 font-bold text-xl text-white"><Dna className="w-8 h-8" />NEURO_LAB</div>
-              <div className="hidden lg:flex items-center gap-2 font-bold text-xl text-white"><HeartPulse className="w-8 h-8" />INST_CARD</div>
+            <p className="text-center text-sm font-medium text-slate-500 mb-6 uppercase tracking-widest">Certificado Por</p>
+            <div className="grid grid-cols-2 gap-8 md:grid-cols-4 items-center justify-items-center">
+              <a href="https://socimex-mfr.org/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-16 px-4 opacity-80 hover:opacity-100 transition-opacity duration-300" title="Sociedad Mexicana de Medicina Física y Rehabilitación A.C.">
+                <img src="/logos/socimex.jpg" alt="Sociedad Mexicana de Medicina Física y Rehabilitación A.C." className="max-h-16 w-auto object-contain rounded" />
+              </a>
+              <a href="https://mesoheal.com.mx/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-16 px-4 opacity-80 hover:opacity-100 transition-opacity duration-300" title="Mesoheal">
+                <img src="/logos/mesoheal.png" alt="Mesoheal" className="max-h-14 w-auto object-contain brightness-0 invert" />
+              </a>
+              <a href="https://www.medrent.mx/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-16 px-4 opacity-80 hover:opacity-100 transition-opacity duration-300" title="MedRent">
+                <img src="/logos/medrent.png" alt="MedRent" className="max-h-14 w-auto object-contain brightness-0 invert" />
+              </a>
+              <a href="https://www.aspid.com.mx/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-16 px-4 opacity-80 hover:opacity-100 transition-opacity duration-300" title="Fibroquel - ASPID Pharma">
+                <img src="/logos/aspid.png" alt="Fibroquel - ASPID Pharma" className="max-h-16 w-auto object-contain brightness-0 invert" />
+              </a>
             </div>
           </div>
         </section>
