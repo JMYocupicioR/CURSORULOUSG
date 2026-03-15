@@ -103,20 +103,151 @@ export async function getLesson(id: string) {
 
 export async function getLiveSessions(): Promise<LiveSession[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return [];
+
+  // First, get sessions that are published and either send_to_all or user is a recipient
+  const { data: allSessions, error } = await supabase
     .from("live_sessions")
     .select("*")
+    .eq("is_published", true)
     .gte("session_date", new Date().toISOString())
-    .order("session_date", { ascending: true })
-    .limit(1);
+    .order("session_date", { ascending: true });
 
   if (error) {
     console.error("Error fetching live sessions:", error);
     return [];
   }
 
-  return data as LiveSession[];
+  if (!allSessions || allSessions.length === 0) return [];
+
+  // For sessions with send_to_all = false, check if user is a recipient
+  const sessionsNeedingCheck = allSessions.filter(s => !s.send_to_all);
+  
+  if (sessionsNeedingCheck.length > 0) {
+    const sessionIds = sessionsNeedingCheck.map(s => s.id);
+    const { data: recipientRecords } = await supabase
+      .from("session_recipients")
+      .select("session_id")
+      .eq("user_id", user.id)
+      .in("session_id", sessionIds);
+
+    const allowedSessionIds = new Set(recipientRecords?.map(r => r.session_id) || []);
+    
+    return allSessions.filter(s => 
+      s.send_to_all || allowedSessionIds.has(s.id)
+    ) as LiveSession[];
+  }
+
+  return allSessions as LiveSession[];
 }
+
+// ============================================================
+// NOTIFICATIONS (Student)
+// ============================================================
+export type NotificationItem = {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string | null;
+  type: string;
+  reference_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function getUserNotifications(limit = 20): Promise<NotificationItem[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Error fetching notifications:", error);
+    return [];
+  }
+
+  return (data as NotificationItem[]) || [];
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
+
+  if (error) {
+    console.error("Error fetching unread count:", error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// ============================================================
+// ADMIN: All Live Sessions
+// ============================================================
+export async function getAllLiveSessions() {
+  const supabase = await createClient();
+
+  const { data: sessions, error } = await supabase
+    .from("live_sessions")
+    .select("*")
+    .order("session_date", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching all live sessions:", error);
+    return [];
+  }
+
+  // Get recipient counts for non-send_to_all sessions
+  if (sessions && sessions.length > 0) {
+    const sessionIds = sessions.filter(s => !s.send_to_all).map(s => s.id);
+    
+    if (sessionIds.length > 0) {
+      const { data: recipients } = await supabase
+        .from("session_recipients")
+        .select("session_id, user_id")
+        .in("session_id", sessionIds);
+
+      const recipientCounts: Record<string, number> = {};
+      recipients?.forEach(r => {
+        recipientCounts[r.session_id] = (recipientCounts[r.session_id] || 0) + 1;
+      });
+
+      return sessions.map(s => ({
+        ...s,
+        recipientCount: s.send_to_all ? null : (recipientCounts[s.id] || 0),
+      }));
+    }
+  }
+
+  return sessions?.map(s => ({ ...s, recipientCount: s.send_to_all ? null : 0 })) || [];
+}
+
+export async function getLiveSessionRecipients(sessionId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_recipients")
+    .select("user_id")
+    .eq("session_id", sessionId);
+
+  if (error) return [];
+  return data?.map(r => r.user_id) || [];
+}
+
 
 export async function getUserCertificates(): Promise<Certificate[]> {
   const supabase = await createClient();

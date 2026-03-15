@@ -1,5 +1,5 @@
 import { Header } from "@/components/dashboard/header"
-import { getUserProfile, getUserEnrollment, getModules, getLiveSessions, getUserCertificates, getUserCompletedLessons, getMicroLessons, getRecentActivity, getStudyStreak, getCertificateConfig } from "@/lib/data"
+import { getUserProfile, getUserEnrollment, getModules, getLiveSessions, getUserCertificates, getUserCompletedLessons, getMicroLessons, getRecentActivity, getStudyStreak, getCertificateConfig, getUserNotifications, getUnreadNotificationCount } from "@/lib/data"
 import Link from "next/link"
 import { CertificateGenerator } from "@/components/student/CertificateGenerator"
 
@@ -16,6 +16,8 @@ export default async function DashboardPage() {
   const recentActivity = await getRecentActivity(5)
   const streak = await getStudyStreak()
   const certConfig = await getCertificateConfig()
+  const notifications = await getUserNotifications(15)
+  const unreadCount = await getUnreadNotificationCount()
   
   const activeModule = modules.find(m => m.id === enrollment?.module_id) || modules[0];
   const progressPercent = enrollment?.progress || 0;
@@ -56,7 +58,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Header userName={displayName} />
+      <Header userName={displayName} notifications={notifications} unreadCount={unreadCount} />
       <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-background-light dark:bg-background-dark font-body">
         <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
@@ -243,12 +245,33 @@ export default async function DashboardPage() {
               {liveSessions.length > 0 ? (
                 liveSessions.map((session) => (
                   <div key={session.id} className="bg-white/10 rounded-xl p-4 backdrop-blur-sm border border-white/10 mb-4">
-                    <p className="text-xs text-primary font-bold uppercase tracking-wider mb-1">Webinar</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs text-primary font-bold uppercase tracking-wider">Clase en Vivo</p>
+                      {session.platform && (
+                        <span className="text-[10px] text-gray-400 bg-white/10 px-1.5 py-0.5 rounded">
+                          {session.platform === 'zoom' ? 'Zoom' : session.platform === 'meet' ? 'Google Meet' : session.platform === 'teams' ? 'Teams' : 'Enlace'}
+                        </span>
+                      )}
+                    </div>
                     <p className="font-bold text-lg leading-tight mb-2">{session.title}</p>
-                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-gray-300 mb-3">
                       <span className="material-symbols-outlined text-base">calendar_month</span>
                       <span>{new Date(session.session_date).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} hrs</span>
+                      {session.duration_minutes && (
+                        <span className="text-xs text-gray-400">· {session.duration_minutes} min</span>
+                      )}
                     </div>
+                    {session.meeting_url && (
+                      <a
+                        href={session.meeting_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-white text-secondary font-bold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-lg">videocam</span>
+                        Unirse a la Sesión
+                      </a>
+                    )}
                   </div>
                 ))
               ) : (
@@ -256,10 +279,6 @@ export default async function DashboardPage() {
                   <p className="text-sm text-gray-300">No hay sesiones en vivo programadas próximamente.</p>
                 </div>
               )}
-              
-              <button disabled={liveSessions.length === 0} className="w-full bg-white text-secondary font-bold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {liveSessions.length > 0 ? "Inscribirse" : "No disponible"}
-              </button>
             </div>
 
             {/* Recent Activity */}

@@ -4,8 +4,26 @@ import Link from "next/link"
 import { useTheme } from "next-themes"
 import { Logo } from "@/components/ui/logo"
 import { useSidebar } from "./sidebar-context"
+import { NotificationBell } from "@/components/student/NotificationBell"
 
-export function Header({ title = "Dashboard", userName }: { title?: string; userName?: string }) {
+type NotificationItem = {
+  id: string
+  title: string
+  body: string | null
+  type: string
+  reference_id: string | null
+  is_read: boolean
+  created_at: string
+}
+
+interface HeaderProps {
+  title?: string
+  userName?: string
+  notifications?: NotificationItem[]
+  unreadCount?: number
+}
+
+export function Header({ title = "Dashboard", userName, notifications = [], unreadCount = 0 }: HeaderProps) {
   const { setTheme, theme } = useTheme()
   const { toggle } = useSidebar()
 
@@ -45,11 +63,11 @@ export function Header({ title = "Dashboard", userName }: { title?: string; user
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 relative">
-          <span className="material-symbols-outlined">notifications</span>
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+      <div className="flex items-center gap-2">
+        <NotificationBell
+          notifications={notifications}
+          unreadCount={unreadCount}
+        />
         <button
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
