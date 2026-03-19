@@ -54,11 +54,13 @@ type QuizFormValues = z.infer<typeof quizSchema>
 export function QuizBuilder({ 
   modules = [],
   editLessonId,
-  onCloseEdit
+  onCloseEdit,
+  compact = false
 }: { 
   modules: Module[]
   editLessonId?: string
   onCloseEdit?: () => void
+  compact?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(!!editLessonId)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -241,10 +243,13 @@ export function QuizBuilder({
       {!editLessonId && (
         <button 
           onClick={() => setIsOpen(true)}
-          className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 rounded-xl transition-colors font-semibold mt-4"
+          className={compact 
+            ? "px-3 py-1.5 bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-violet-500/20"
+            : "w-full flex items-center justify-center gap-2 px-5 py-3 text-xs text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 rounded-xl transition-colors font-semibold mt-4"
+          }
         >
-          <span className="material-symbols-outlined text-base">quiz</span>
-          Constructor de Evaluaciones
+          <span className="material-symbols-outlined text-sm">quiz</span>
+          {compact ? 'Evaluación' : 'Constructor de Evaluaciones'}
         </button>
       )}
 

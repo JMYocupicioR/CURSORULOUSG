@@ -59,19 +59,18 @@ type Module = {
 }
 
 function LessonIcon({ type }: { type: string }) {
-  if (type === "quiz") {
-    return <span className="material-symbols-outlined text-violet-400 text-lg">quiz</span>
+  const icons: Record<string, { icon: string; color: string }> = {
+    quiz: { icon: "quiz", color: "text-violet-400" },
+    document: { icon: "description", color: "text-blue-400" },
+    image: { icon: "image", color: "text-teal-400" },
+    link: { icon: "link", color: "text-amber-400" },
+    blog: { icon: "article", color: "text-rose-400" },
+    audio: { icon: "headphones", color: "text-indigo-400" },
+    infographic: { icon: "photo_library", color: "text-orange-400" },
+    video: { icon: "play_circle", color: "text-primary" },
   }
-  if (type === "document") {
-    return <span className="material-symbols-outlined text-blue-400 text-lg">description</span>
-  }
-  if (type === "image") {
-    return <span className="material-symbols-outlined text-teal-400 text-lg">image</span>
-  }
-  if (type === "link") {
-    return <span className="material-symbols-outlined text-amber-400 text-lg">link</span>
-  }
-  return <span className="material-symbols-outlined text-primary text-lg">play_circle</span>
+  const cfg = icons[type] || icons.video
+  return <span className={`material-symbols-outlined ${cfg.color} text-lg`}>{cfg.icon}</span>
 }
 
 function LessonStatus({ status }: { status: boolean }) {
@@ -155,10 +154,30 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
   const [editingImage, setEditingImage] = useState<{ moduleId: string, title: string, file: File | null } | null>(null)
   const [isSubmittingImage, setIsSubmittingImage] = useState(false)
 
+  // Upload Engine (Video/Document) State
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [uploadType, setUploadType] = useState<"video" | "document">("video")
+  const [uploadModuleId, setUploadModuleId] = useState("")
+  const [uploadModuleLessons, setUploadModuleLessons] = useState<{ id: string; title: string }[]>([])
+
+  // Blog Modal State
+  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false)
+  const [editingBlog, setEditingBlog] = useState<{ moduleId: string, title: string, content: string } | null>(null)
+  const [isSubmittingBlog, setIsSubmittingBlog] = useState(false)
+
+  // Audio Modal State
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false)
+  const [editingAudio, setEditingAudio] = useState<{ moduleId: string, title: string, file: File | null } | null>(null)
+  const [isSubmittingAudio, setIsSubmittingAudio] = useState(false)
+
+  // Infographic Modal State
+  const [isInfographicModalOpen, setIsInfographicModalOpen] = useState(false)
+  const [editingInfographic, setEditingInfographic] = useState<{ moduleId: string, title: string, files: File[] } | null>(null)
+  const [isSubmittingInfographic, setIsSubmittingInfographic] = useState(false)
+
   const handleSaveLink = async () => {
     if (!editingLink || !editingLink.title.trim() || !editingLink.url.trim()) return
     setIsSubmittingLink(true)
-    // Importing dynamically to avoid breaking existing imports at top
     const { createLinkLesson } = await import('@/app/actions/contentSetup')
     const res = await createLinkLesson({ moduleId: editingLink.moduleId, title: editingLink.title, linkUrl: editingLink.url })
     setIsSubmittingLink(false)
@@ -173,23 +192,15 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
   const handleSaveImage = async () => {
     if (!editingImage || !editingImage.title.trim() || !editingImage.file) return
     setIsSubmittingImage(true)
-    
     try {
       const fileExt = editingImage.file.name.split('.').pop()
       const fileName = `${Math.random()}.${fileExt}`
       const filePath = `thumbnails/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('thumbnails') 
-        .upload(filePath, editingImage.file)
-
+      const { error: uploadError } = await supabase.storage.from('thumbnails').upload(filePath, editingImage.file)
       if (uploadError) throw uploadError
-
       const { data } = supabase.storage.from('thumbnails').getPublicUrl(filePath)
-      
       const { createImageLesson } = await import('@/app/actions/contentSetup')
       const res = await createImageLesson({ moduleId: editingImage.moduleId, title: editingImage.title, imageUrl: data.publicUrl })
-      
       if (res?.success) {
         toast.success("Imagen añadida")
         setIsImageModalOpen(false)
@@ -200,6 +211,72 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
       toast.error('Error al subir imagen: ' + (error as Error).message)
     } finally {
       setIsSubmittingImage(false)
+    }
+  }
+
+  const handleSaveBlog = async () => {
+    if (!editingBlog || !editingBlog.title.trim() || !editingBlog.content.trim()) return
+    setIsSubmittingBlog(true)
+    const { createBlogLesson } = await import('@/app/actions/contentSetup')
+    const res = await createBlogLesson({ moduleId: editingBlog.moduleId, title: editingBlog.title, content: editingBlog.content })
+    setIsSubmittingBlog(false)
+    if (res?.success) {
+      toast.success("Entrada de blog añadida")
+      setIsBlogModalOpen(false)
+    } else {
+      toast.error(res?.error || "Error al crear blog")
+    }
+  }
+
+  const handleSaveAudio = async () => {
+    if (!editingAudio || !editingAudio.title.trim() || !editingAudio.file) return
+    setIsSubmittingAudio(true)
+    try {
+      const fileExt = editingAudio.file.name.split('.').pop()
+      const fileName = `audio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from('docs').upload(fileName, editingAudio.file)
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('docs').getPublicUrl(fileName)
+      const { createAudioLesson } = await import('@/app/actions/contentSetup')
+      const res = await createAudioLesson({ moduleId: editingAudio.moduleId, title: editingAudio.title, audioUrl: data.publicUrl })
+      if (res?.success) {
+        toast.success("Audio añadido")
+        setIsAudioModalOpen(false)
+      } else {
+        toast.error(res?.error || "Error al añadir audio")
+      }
+    } catch (error) {
+      toast.error('Error al subir audio: ' + (error as Error).message)
+    } finally {
+      setIsSubmittingAudio(false)
+    }
+  }
+
+  const handleSaveInfographic = async () => {
+    if (!editingInfographic || !editingInfographic.title.trim() || editingInfographic.files.length === 0) return
+    setIsSubmittingInfographic(true)
+    try {
+      const urls: string[] = []
+      for (const file of editingInfographic.files) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `infographic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`
+        const { error: uploadError } = await supabase.storage.from('thumbnails').upload(`infographics/${fileName}`, file)
+        if (uploadError) throw uploadError
+        const { data } = supabase.storage.from('thumbnails').getPublicUrl(`infographics/${fileName}`)
+        urls.push(data.publicUrl)
+      }
+      const { createInfographicLesson } = await import('@/app/actions/contentSetup')
+      const res = await createInfographicLesson({ moduleId: editingInfographic.moduleId, title: editingInfographic.title, imageUrls: urls })
+      if (res?.success) {
+        toast.success("Infografía añadida")
+        setIsInfographicModalOpen(false)
+      } else {
+        toast.error(res?.error || "Error al crear infografía")
+      }
+    } catch (error) {
+      toast.error('Error al subir infografía: ' + (error as Error).message)
+    } finally {
+      setIsSubmittingInfographic(false)
     }
   }
 
@@ -393,8 +470,8 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
           ))}
         </div>
 
-        {/* Upload Zone */}
-        <UploadEngine modules={localModules} />
+        {/* Upload Engine Modal (controlled) */}
+        <UploadEngine open={isUploadOpen} onOpenChange={setIsUploadOpen} uploadType={uploadType} moduleId={uploadModuleId} moduleLessons={uploadModuleLessons} />
 
         {/* Modules Accordion */}
         <div className="space-y-3">
@@ -500,9 +577,30 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
                     </div>
 
                     <div className="p-4 bg-gray-50 dark:bg-black/20 border-t border-gray-200 dark:border-white/5 flex flex-col gap-3">
-                       <QuizBuilder modules={[mod]} />
-                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-4 border-t border-gray-200 dark:border-white/5">
-                         <span className="text-xs font-semibold text-gray-500 mr-2">Añadir Recurso:</span>
+                       <div className="flex flex-wrap items-center gap-2 pt-2">
+                         <span className="text-xs font-semibold text-gray-500 mr-2">Añadir:</span>
+                         <button 
+                           onClick={() => {
+                             setUploadType("video")
+                             setUploadModuleId(mod.id)
+                             setUploadModuleLessons([])
+                             setIsUploadOpen(true)
+                           }}
+                           className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-primary/20"
+                         >
+                           <span className="material-symbols-outlined text-sm">videocam</span> Video
+                         </button>
+                         <button 
+                           onClick={() => {
+                             setUploadType("document")
+                             setUploadModuleId(mod.id)
+                             setUploadModuleLessons((mod.lessons || []).map(l => ({ id: l.id, title: l.title })))
+                             setIsUploadOpen(true)
+                           }}
+                           className="px-3 py-1.5 bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-violet-500/20"
+                         >
+                           <span className="material-symbols-outlined text-sm">description</span> Documento
+                         </button>
                          <button 
                            onClick={() => {
                              setEditingLink({ moduleId: mod.id, title: "", url: "" })
@@ -521,7 +619,34 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
                          >
                            <span className="material-symbols-outlined text-sm">image</span> Imagen
                          </button>
-                         {/* To add specific documents or videos directly here, we could add them, but the UploadEngine at the top covers them well for now. The user asked specifically for easier image and links. */}
+                         <button 
+                           onClick={() => {
+                             setEditingBlog({ moduleId: mod.id, title: "", content: "" })
+                             setIsBlogModalOpen(true)
+                           }}
+                           className="px-3 py-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-rose-500/20"
+                         >
+                           <span className="material-symbols-outlined text-sm">article</span> Blog
+                         </button>
+                         <button 
+                           onClick={() => {
+                             setEditingInfographic({ moduleId: mod.id, title: "", files: [] })
+                             setIsInfographicModalOpen(true)
+                           }}
+                           className="px-3 py-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-orange-500/20"
+                         >
+                           <span className="material-symbols-outlined text-sm">photo_library</span> Infografía
+                         </button>
+                         <button 
+                           onClick={() => {
+                             setEditingAudio({ moduleId: mod.id, title: "", file: null })
+                             setIsAudioModalOpen(true)
+                           }}
+                           className="px-3 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 border border-indigo-500/20"
+                         >
+                           <span className="material-symbols-outlined text-sm">headphones</span> Audio
+                         </button>
+                         <QuizBuilder modules={[mod]} compact />
                        </div>
                     </div>
                   </div>
@@ -1044,6 +1169,147 @@ export function ContenidoClient({ modules }: { modules: Module[] }) {
           editLessonId={editingQuizLessonId} 
           onCloseEdit={() => setEditingQuizLessonId(null)} 
         />
+      )}
+
+      {/* Blog Modal */}
+      {isBlogModalOpen && editingBlog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="p-6 shrink-0">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-rose-500">article</span>
+                Crear Entrada de Blog
+              </h2>
+              <p className="text-xs text-gray-400">Crea contenido de texto enriquecido como en un editor de Word.</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-2 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Título</label>
+                <input
+                  type="text"
+                  value={editingBlog.title}
+                  onChange={(e) => setEditingBlog({ ...editingBlog, title: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-gray-900 dark:text-white"
+                  placeholder="Ej. Guía Completa de Anatomía del Hombro"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Contenido</label>
+                <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 min-h-[250px]">
+                  <RichTextEditor
+                    content={editingBlog.content}
+                    onChange={(content) => setEditingBlog({ ...editingBlog, content })}
+                    placeholder="Escribe tu artículo aquí con texto enriquecido..."
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 shrink-0">
+              <button type="button" onClick={() => setIsBlogModalOpen(false)} disabled={isSubmittingBlog}
+                className="px-6 py-2.5 rounded-xl font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+              <button type="button" onClick={handleSaveBlog} disabled={isSubmittingBlog || !editingBlog.title.trim() || !editingBlog.content.trim()}
+                className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-white rounded-xl font-semibold shadow-lg shadow-rose-500/25 transition-all disabled:opacity-50">
+                {isSubmittingBlog ? "Guardando..." : "Publicar Blog"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audio Modal */}
+      {isAudioModalOpen && editingAudio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 shadow-2xl">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-500">headphones</span>
+                Añadir Audio
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Título</label>
+                  <input type="text" value={editingAudio.title} onChange={(e) => setEditingAudio({ ...editingAudio, title: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-gray-900 dark:text-white"
+                    placeholder="Ej. Podcast - Introducción a USG" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Archivo de Audio</label>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-gray-50 dark:bg-black/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <span className="material-symbols-outlined text-3xl text-gray-400 mb-2">audio_file</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">{editingAudio.file ? editingAudio.file.name : 'Haz click para subir'}</span></p>
+                      {!editingAudio.file && <p className="text-xs text-gray-500 dark:text-gray-400">MP3, WAV, OGG</p>}
+                    </div>
+                    <input type="file" className="hidden" accept="audio/*" onChange={(e) => e.target.files && setEditingAudio({ ...editingAudio, file: e.target.files[0] })} />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+              <button type="button" onClick={() => setIsAudioModalOpen(false)} disabled={isSubmittingAudio}
+                className="px-6 py-2.5 rounded-xl font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+              <button type="button" onClick={handleSaveAudio} disabled={isSubmittingAudio || !editingAudio.title.trim() || !editingAudio.file}
+                className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-semibold shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50">
+                {isSubmittingAudio ? "Subiendo..." : "Subir Audio"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Infographic Modal */}
+      {isInfographicModalOpen && editingInfographic && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800 shadow-2xl">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500">photo_library</span>
+                Añadir Infografía
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Título</label>
+                  <input type="text" value={editingInfographic.title} onChange={(e) => setEditingInfographic({ ...editingInfographic, title: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500/50 text-gray-900 dark:text-white"
+                    placeholder="Ej. Anatomía del Plexo Braquial" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Imágenes (múltiples)</label>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-gray-50 dark:bg-black/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <span className="material-symbols-outlined text-3xl text-gray-400 mb-2">add_photo_alternate</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">{editingInfographic.files.length > 0 ? `${editingInfographic.files.length} archivos seleccionados` : 'Selecciona imágenes'}</span></p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, WebP • Múltiples archivos</p>
+                    </div>
+                    <input type="file" className="hidden" accept="image/*" multiple onChange={(e) => {
+                      if (e.target.files) setEditingInfographic({ ...editingInfographic, files: [...editingInfographic.files, ...Array.from(e.target.files)] })
+                    }} />
+                  </label>
+                  {editingInfographic.files.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {editingInfographic.files.map((f, i) => (
+                        <span key={i} className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-1 rounded-lg flex items-center gap-1">
+                          {f.name}
+                          <button type="button" onClick={() => setEditingInfographic({ ...editingInfographic, files: editingInfographic.files.filter((_, idx) => idx !== i) })} className="hover:text-red-400">
+                            <span className="material-symbols-outlined text-[12px]">close</span>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+              <button type="button" onClick={() => setIsInfographicModalOpen(false)} disabled={isSubmittingInfographic}
+                className="px-6 py-2.5 rounded-xl font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+              <button type="button" onClick={handleSaveInfographic} disabled={isSubmittingInfographic || !editingInfographic.title.trim() || editingInfographic.files.length === 0}
+                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/25 transition-all disabled:opacity-50">
+                {isSubmittingInfographic ? "Subiendo..." : "Subir Infografía"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

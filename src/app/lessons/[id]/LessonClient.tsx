@@ -117,6 +117,9 @@ function LessonSidebar({ sidebarOpen, setSidebarOpen, moduleTitle, moduleLessons
     document: 'description',
     image: 'image',
     link: 'link',
+    blog: 'article',
+    audio: 'headphones',
+    infographic: 'photo_library',
   }
 
   const completedCount = moduleLessons.filter(l => l.is_completed).length
@@ -807,6 +810,230 @@ export function LessonClient({
           </main>
           <LessonSidebar {...sharedSidebarProps} />
         </div>
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────
+  // BLOG VIEW
+  // ─────────────────────────────────────────────
+  if (lesson.lesson_type === 'blog') {
+    return (
+      <div className="flex flex-col h-full">
+        <TopBar {...sharedTopBarProps} />
+        <div className="flex flex-1 overflow-hidden relative">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-rose-500">article</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider">Artículo</p>
+                  <h1 className="text-2xl md:text-3xl font-bold text-secondary dark:text-white">{lesson.title}</h1>
+                </div>
+              </div>
+              {lesson.description && (
+                <article
+                  className="prose prose-lg dark:prose-invert max-w-none mb-8 lesson-description"
+                  dangerouslySetInnerHTML={{ __html: lesson.description }}
+                />
+              )}
+              <StudentNotes lessonId={lesson.id} />
+              <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
+                {!isCompleted ? (
+                  <button
+                    onClick={() => handleComplete()}
+                    disabled={marking}
+                    className="flex-1 px-8 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2.5 transition-all active:scale-95 bg-primary hover:bg-cyan-500 text-white shadow-primary/20"
+                  >
+                    <span className="material-symbols-outlined">task_alt</span>
+                    {marking ? 'Guardando...' : 'Marcar como Completada'}
+                  </button>
+                ) : (
+                  <div className="flex-1 px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-green-500/10 text-green-500 border border-green-500/20">
+                    <span className="material-symbols-outlined">check_circle</span>
+                    Completada
+                  </div>
+                )}
+                {nextLesson && (
+                  <Link
+                    href={`/lessons/${nextLesson.id}`}
+                    className="flex-1 bg-gray-100 dark:bg-gray-800 text-secondary dark:text-white font-semibold px-6 py-3 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Siguiente <span className="material-symbols-outlined">arrow_forward</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </main>
+          <LessonSidebar {...sharedSidebarProps} />
+        </div>
+        {showFloatingNext && <FloatingNextButton nextLesson={nextLesson} />}
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────
+  // AUDIO VIEW
+  // ─────────────────────────────────────────────
+  if (lesson.lesson_type === 'audio') {
+    const audioMaterials = lesson.materials || []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const audioUrl = audioMaterials.length > 0 ? (audioMaterials[0] as any).url : ''
+    return (
+      <div className="flex flex-col h-full">
+        <TopBar {...sharedTopBarProps} />
+        <div className="flex flex-1 overflow-hidden relative">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-indigo-500">headphones</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Audio</p>
+                  <h1 className="text-2xl md:text-3xl font-bold text-secondary dark:text-white">{lesson.title}</h1>
+                </div>
+              </div>
+              {lesson.description && (
+                <div className="lesson-description text-gray-500 dark:text-gray-400 mb-6 max-w-2xl" dangerouslySetInnerHTML={{ __html: lesson.description }} />
+              )}
+              {audioUrl ? (
+                <div className="bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-6 mb-8 max-w-2xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-indigo-500 text-3xl">headphones</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-secondary dark:text-white">{lesson.title}</h3>
+                      <p className="text-sm text-gray-400">Reproduce el archivo de audio</p>
+                    </div>
+                  </div>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <audio controls className="w-full rounded-lg" preload="metadata">
+                    <source src={audioUrl} />
+                    Tu navegador no soporta el elemento de audio.
+                  </audio>
+                </div>
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-12 text-center mb-8">
+                  <span className="material-symbols-outlined text-5xl text-gray-300 mb-3 block">headphones_off</span>
+                  <p className="text-gray-500">Audio no disponible</p>
+                </div>
+              )}
+              <StudentNotes lessonId={lesson.id} />
+              <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
+                {!isCompleted ? (
+                  <button
+                    onClick={() => handleComplete()}
+                    disabled={marking}
+                    className="flex-1 px-8 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2.5 transition-all active:scale-95 bg-primary hover:bg-cyan-500 text-white shadow-primary/20"
+                  >
+                    <span className="material-symbols-outlined">task_alt</span>
+                    {marking ? 'Guardando...' : 'Marcar como Completada'}
+                  </button>
+                ) : (
+                  <div className="flex-1 px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-green-500/10 text-green-500 border border-green-500/20">
+                    <span className="material-symbols-outlined">check_circle</span>
+                    Completada
+                  </div>
+                )}
+                {nextLesson && (
+                  <Link
+                    href={`/lessons/${nextLesson.id}`}
+                    className="flex-1 bg-gray-100 dark:bg-gray-800 text-secondary dark:text-white font-semibold px-6 py-3 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Siguiente <span className="material-symbols-outlined">arrow_forward</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </main>
+          <LessonSidebar {...sharedSidebarProps} />
+        </div>
+        {showFloatingNext && <FloatingNextButton nextLesson={nextLesson} />}
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────
+  // INFOGRAPHIC VIEW
+  // ─────────────────────────────────────────────
+  if (lesson.lesson_type === 'infographic') {
+    const images = (lesson.materials || []) as Array<{ title: string; url: string }>
+    return (
+      <div className="flex flex-col h-full">
+        <TopBar {...sharedTopBarProps} />
+        <div className="flex flex-1 overflow-hidden relative">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-orange-500">photo_library</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Infografía</p>
+                  <h1 className="text-2xl md:text-3xl font-bold text-secondary dark:text-white">{lesson.title}</h1>
+                </div>
+              </div>
+              {lesson.description && (
+                <div className="lesson-description text-gray-500 dark:text-gray-400 mb-6 max-w-2xl" dangerouslySetInnerHTML={{ __html: lesson.description }} />
+              )}
+              {images.length > 0 ? (
+                <div className="space-y-4 mb-8">
+                  {images.map((img, i) => (
+                    <div key={i} className="bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="bg-black/5 dark:bg-white/5 flex items-center justify-center p-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.url} alt={img.title || `Imagen ${i + 1}`} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+                      </div>
+                      <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <span className="text-sm text-gray-500">{img.title}</span>
+                        <a href={img.url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:text-cyan-500 font-medium flex items-center gap-1">
+                          <span className="material-symbols-outlined text-base">open_in_new</span> Abrir
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-12 text-center mb-8">
+                  <span className="material-symbols-outlined text-5xl text-gray-300 mb-3 block">photo_library</span>
+                  <p className="text-gray-500">No hay imágenes disponibles</p>
+                </div>
+              )}
+              <StudentNotes lessonId={lesson.id} />
+              <div className="flex flex-col sm:flex-row gap-3 max-w-2xl">
+                {!isCompleted ? (
+                  <button
+                    onClick={() => handleComplete()}
+                    disabled={marking}
+                    className="flex-1 px-8 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2.5 transition-all active:scale-95 bg-primary hover:bg-cyan-500 text-white shadow-primary/20"
+                  >
+                    <span className="material-symbols-outlined">task_alt</span>
+                    {marking ? 'Guardando...' : 'Marcar como Completada'}
+                  </button>
+                ) : (
+                  <div className="flex-1 px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-green-500/10 text-green-500 border border-green-500/20">
+                    <span className="material-symbols-outlined">check_circle</span>
+                    Completada
+                  </div>
+                )}
+                {nextLesson && (
+                  <Link
+                    href={`/lessons/${nextLesson.id}`}
+                    className="flex-1 bg-gray-100 dark:bg-gray-800 text-secondary dark:text-white font-semibold px-6 py-3 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Siguiente <span className="material-symbols-outlined">arrow_forward</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </main>
+          <LessonSidebar {...sharedSidebarProps} />
+        </div>
+        {showFloatingNext && <FloatingNextButton nextLesson={nextLesson} />}
       </div>
     )
   }

@@ -464,6 +464,81 @@ export async function createLinkLesson({ moduleId, title, linkUrl }: { moduleId:
   return { success: true, newLessonId: newLesson.id };
 }
 
+export async function createBlogLesson({ moduleId, title, content }: { moduleId: string; title: string; content: string }) {
+  const supabase = await createClient();
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
+
+  const { data: newLesson, error } = await supabase.from("lessons").insert({
+    module_id: moduleId,
+    title: title,
+    lesson_type: "blog",
+    description: content,
+    is_published: true
+  }).select("id").single();
+
+  if (error) {
+    console.error("DB error adding blog lesson:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/contenido");
+  return { success: true, newLessonId: newLesson.id };
+}
+
+export async function createAudioLesson({ moduleId, title, audioUrl }: { moduleId: string; title: string; audioUrl: string }) {
+  const supabase = await createClient();
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
+
+  const { data: newLesson, error } = await supabase.from("lessons").insert({
+    module_id: moduleId,
+    title: title,
+    lesson_type: "audio",
+    materials: [{ title: title, url: audioUrl }],
+    is_published: true
+  }).select("id").single();
+
+  if (error) {
+    console.error("DB error adding audio lesson:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/contenido");
+  return { success: true, newLessonId: newLesson.id };
+}
+
+export async function createInfographicLesson({ moduleId, title, imageUrls }: { moduleId: string; title: string; imageUrls: string[] }) {
+  const supabase = await createClient();
+  
+  if (!(await verifyAdmin(supabase))) {
+    return { success: false, error: "Not an admin" };
+  }
+
+  const materials = imageUrls.map((url, i) => ({ title: `Imagen ${i + 1}`, url }));
+
+  const { data: newLesson, error } = await supabase.from("lessons").insert({
+    module_id: moduleId,
+    title: title,
+    lesson_type: "infographic",
+    materials: materials,
+    thumbnail_url: imageUrls[0] || null,
+    is_published: true
+  }).select("id").single();
+
+  if (error) {
+    console.error("DB error adding infographic lesson:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/contenido");
+  return { success: true, newLessonId: newLesson.id };
+}
+
 export async function createModule(data: { title: string; description?: string; thumbnail_url?: string; prerequisite_module_id?: string | null }) {
   const supabase = await createClient();
   
