@@ -82,12 +82,22 @@ export async function saveCertificateConfig(config: Partial<CertificateConfig>) 
 // GET NEXT FOLIO NUMBER
 // ============================================================
 async function getNextFolioNumber(supabase: Awaited<ReturnType<typeof createClient>>, prefix: string) {
-  const { count } = await supabase
+  // Fetch existing folios to find the highest number (counting rows fails when certificates are deleted)
+  const { data: rows } = await supabase
     .from("certificates")
-    .select("*", { count: "exact", head: true })
+    .select("folio")
     .ilike("folio", `${prefix}%`)
 
-  const nextNum = (count ?? 0) + 1
+  let maxNum = 0
+  if (rows && rows.length > 0) {
+    for (const r of rows) {
+      const suffix = (r.folio as string).replace(prefix, "")
+      const num = parseInt(suffix, 10)
+      if (!isNaN(num) && num > maxNum) maxNum = num
+    }
+  }
+
+  const nextNum = maxNum + 1
   return `${prefix}${String(nextNum).padStart(4, "0")}`
 }
 
